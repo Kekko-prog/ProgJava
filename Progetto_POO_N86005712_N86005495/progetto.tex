@@ -1,0 +1,1676 @@
+\documentclass[12pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[italian]{babel}
+\usepackage{geometry}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{enumitem}
+
+\geometry{margin=2.2cm}
+
+\lstdefinestyle{sqlstyle}{
+  basicstyle=\ttfamily\small,
+  keywordstyle=\color{blue},
+  commentstyle=\color{gray},
+  stringstyle=\color{teal},
+  showstringspaces=false,
+  breaklines=true,
+  frame=single
+}
+
+\title{Documentazione Completa e Didattica del Progetto\\Concessionario Auto \& Moto}
+\author{N86005495 \and N86005712}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+\tableofcontents
+\newpage
+
+\section{Come leggere questo documento (se parti da zero)}
+Questo documento e stato scritto per una persona che non conosce Java.
+Ogni elemento ha sempre tre parti:
+\begin{itemize}
+  \item \textbf{Cosa fa}: descrizione tecnica sintetica.
+  \item \textbf{Perche esiste}: motivazione pratica della presenza nel progetto.
+  \item \textbf{Spiegazione semplice}: spiegazione senza dare per scontati concetti avanzati.
+\end{itemize}
+
+\section{Fondamenti minimi (Java, Swing, JDBC) in linguaggio semplice}
+\subsection{Che cos'e Java (in due righe)}
+Java e un linguaggio di programmazione. Un programma Java e fatto da classi e metodi.
+Il metodo speciale \texttt{main} e il punto di partenza: quando avvii il programma, Java entra li.
+
+\subsection{Che cos'e Swing}
+Swing e una libreria grafica di Java per creare finestre, pulsanti, caselle di testo e tabelle.
+Nel progetto, Swing serve per l'interfaccia del concessionario.
+
+\subsection{Che cos'e JDBC}
+JDBC e il modo standard con cui Java parla con il database SQL.
+In pratica: Java apre una connessione, invia query SQL, riceve risultati.
+
+\section{Panoramica architetturale}
+\textbf{Cosa fa:} il progetto implementa un gestionale desktop per concessionario auto/moto con login a ruoli.
+
+\textbf{Perche esiste:} separare ruoli, dati e schermate rende il programma ordinato, testabile e piu facile da mantenere.
+
+\textbf{Spiegazione semplice:} immagina tre piani:
+\begin{enumerate}
+  \item Piano interfaccia: cio che l'utente vede (finestre e pulsanti).
+  \item Piano logica: regole applicative (chi puo fare cosa).
+  \item Piano dati: database PostgreSQL dove i dati vengono salvati.
+\end{enumerate}
+
+Flusso generale:
+\begin{enumerate}
+  \item Avvio da \texttt{Main.main()}.
+  \item Delega a \texttt{MainApp.main()}.
+  \item Creazione finestra principale \texttt{ConcessionarioFrame}.
+  \item Login per ruolo (cliente o dipendente).
+  \item Navigazione con \texttt{CardLayout} + \texttt{JTabbedPane}.
+  \item Chiamate ai DAO e query SQL.
+  \item Vincoli logici garantiti anche lato DB (trigger/funzioni).
+\end{enumerate}
+
+\section{Classi Java e metodi con motivazione e spiegazione}
+
+\subsection{Package it.unina.prog}
+
+\subsubsection*{DBManager}
+\textbf{Cosa fa:}
+\begin{itemize}
+  \item \texttt{getConnection(): Connection} apre una connessione JDBC al database PostgreSQL.
+\end{itemize}
+
+\textbf{Perche esiste:}
+serve un punto unico per aprire connessioni al DB, cosi si evita di duplicare URL, utente e password in molti file.
+
+\textbf{Spiegazione semplice:}
+DBManager e come una porta di ingresso al database: ogni volta che un DAO deve leggere/scrivere dati, passa da qui.
+
+\textbf{Chiamata principale usata e motivo:}
+\begin{itemize}
+  \item \texttt{DriverManager.getConnection(url, user, password)}: e la chiamata standard Java per collegarsi al DB.
+\end{itemize}
+
+\subsubsection*{Main}
+\textbf{Cosa fa:}
+\begin{itemize}
+  \item \texttt{main(String[] args): void} richiama \texttt{MainApp.main(args)}.
+\end{itemize}
+
+\textbf{Perche esiste:}
+fornisce un punto di ingresso pulito e semplice; puo essere utile anche per cambiare bootstrap senza toccare il resto.
+
+\textbf{Spiegazione semplice:}
+Main e il campanello di casa: suoni li e poi vieni reindirizzato nella stanza dove parte davvero l'app.
+
+\subsubsection*{MainApp}
+\textbf{Cosa fa:}
+\begin{itemize}
+  \item Avvia la GUI sul thread corretto di Swing.
+  \item Imposta il look and feel del sistema.
+  \item Mostra \texttt{ConcessionarioFrame}.
+\end{itemize}
+
+\textbf{Perche esiste:}
+in Swing l'interfaccia deve essere costruita su un thread specifico (EDT), altrimenti possono comparire bug grafici.
+
+\textbf{Spiegazione semplice:}
+MainApp prepara il palco prima dello spettacolo: decide stile grafico e poi apre la finestra principale.
+
+\textbf{Chiamate principali e perche:}
+\begin{itemize}
+  \item \texttt{SwingUtilities.invokeLater(...)}: garantisce che la GUI parta sul thread corretto.
+  \item \texttt{UIManager.setLookAndFeel(...)}: usa stile nativo (piu familiare all'utente).
+  \item \texttt{new ConcessionarioFrame().setVisible(true)}: crea e mostra la finestra.
+\end{itemize}
+
+\subsection{Package it.unina.prog.model}
+
+\subsubsection*{Cliente}
+\textbf{Cosa fa:}
+contiene i dati di un cliente (id, nome, tipo, email, telefono).
+
+\textbf{Perche esiste:}
+serve un contenitore chiaro per passare dati tra DAO e interfaccia.
+
+\textbf{Spiegazione semplice:}
+e una scheda anagrafica in memoria: non fa calcoli complessi, conserva solo informazioni.
+
+\textbf{Metodi e motivazione:}
+\begin{itemize}[leftmargin=1.2cm]
+  \item \texttt{Cliente(...)}: costruttore. Perche: crea l'oggetto completo in un colpo solo.
+  \item \texttt{getId()}, \texttt{getNome()}, \texttt{getTipo()}, \texttt{getEmail()}, \texttt{getTelefono()}: getter. Perche: permettono lettura sicura dei dati senza esporre i campi direttamente.
+\end{itemize}
+
+\subsubsection*{Dipendente}
+\textbf{Cosa fa:}
+modella un dipendente con id, nome, ruolo e password.
+
+\textbf{Perche esiste:}
+serve per autenticare l'utente interno e per mostrare ruolo/id nella sessione.
+
+\textbf{Spiegazione semplice:}
+e il ``cartellino'' digitale del dipendente che entra nel sistema.
+
+\textbf{Metodi e motivazione:}
+\begin{itemize}
+  \item Costruttore \texttt{Dipendente(...)}: crea il record in memoria.
+  \item Getter \texttt{getId/getNome/getRuolo/getPassword}: usati da login e interfaccia.
+\end{itemize}
+
+\subsubsection*{Veicolo}
+\textbf{Cosa fa:}
+rappresenta un veicolo con dati anagrafici, prezzo e stato.
+
+\textbf{Perche esiste:}
+serve una struttura unica per riempire tabelle, combo box e operazioni di vendita/test drive.
+
+\textbf{Spiegazione semplice:}
+e la ``carta d'identita'' del mezzo dentro l'app.
+
+\textbf{Metodi e motivazione:}
+\begin{itemize}
+  \item Costruttore \texttt{Veicolo(...)}: crea un veicolo completo.
+  \item Getter \texttt{getTarga/getMarca/getModello/getTipo/getPrezzo/getStato}: rendono disponibili i dati a UI e DAO.
+\end{itemize}
+
+\subsection{Package it.unina.prog.dao}
+
+\subsubsection*{ClienteDAO}
+\textbf{Cosa fa:}
+gestisce le operazioni SQL legate ai clienti.
+
+\textbf{Perche esiste:}
+separare SQL dalla GUI evita codice disordinato e facilita manutenzione.
+
+\textbf{Spiegazione semplice:}
+DAO significa Data Access Object: e il ``commesso'' che va in magazzino (DB), prende o modifica dati e li riporta all'app.
+
+\textbf{Metodi, perche e spiegazione:}
+\begin{itemize}
+  \item \texttt{inserisciCliente(...)}: crea un cliente nel DB. Perche: serve al pannello dipendente quando registra un nuovo cliente.
+  \item \texttt{getClienti()}: ritorna lista clienti. Perche: serve per mostrare tabella e combo selezione.
+  \item \texttt{getClienteByEmail(email)}: cerca cliente per email. Perche: utile in validazioni/lookup.
+  \item \texttt{autenticaCliente(email, password)}: verifica credenziali cliente. Perche: login ruolo cliente.
+  \item \texttt{aggiornaCliente(...)}: modifica dati senza cambiare password. Perche: aggiornamenti ordinari.
+  \item \texttt{aggiornaClienteConPassword(...)}: modifica anche password. Perche: gestione completa profilo.
+  \item \texttt{eliminaCliente(id)}: elimina cliente. Perche: operazione amministrativa.
+\end{itemize}
+
+\textbf{Chiamate JDBC ricorrenti e motivo:}
+\begin{itemize}
+  \item \texttt{prepareStatement}: evita SQL injection e gestisce parametri.
+  \item \texttt{setString/setInt/...}: inserisce valori nelle query.
+  \item \texttt{executeQuery/executeUpdate}: esegue SELECT o INSERT/UPDATE/DELETE.
+\end{itemize}
+
+\subsubsection*{DipendenteDAO}
+\textbf{Cosa fa:}
+recupera e autentica dipendenti.
+
+\textbf{Perche esiste:}
+la logica di accesso dipendente non deve stare nella GUI.
+
+\textbf{Spiegazione semplice:}
+quando un dipendente inserisce id+password, questa classe controlla se esiste davvero.
+
+\textbf{Metodi:}
+\begin{itemize}
+  \item \texttt{getDipendenteById(id)}: legge record da DB.
+  \item \texttt{autenticaDipendente(id, password)}: confronta password e ritorna oggetto valido o \texttt{null}.
+\end{itemize}
+
+\subsubsection*{VeicoloDAO}
+\textbf{Cosa fa:}
+contiene CRUD veicoli e calcolo stato.
+
+\textbf{Perche esiste:}
+il catalogo veicoli e centrale: vendite, test drive e vista catalogo dipendono da questi dati.
+
+\textbf{Spiegazione semplice:}
+e il reparto ``parco auto/moto'': inserisce mezzi, li aggiorna, li elimina e dice se sono disponibili.
+
+\textbf{Metodi con perche:}
+\begin{itemize}
+  \item \texttt{inserisciVeicolo(...)}: crea nuovo veicolo.
+  \item \texttt{getStatoVeicolo(targa)}: chiede al DB lo stato corrente. Perche: lo stato dipende da vendite/test drive.
+  \item \texttt{getVeicoliDisponibili()}: filtra solo disponibili. Perche: in vendita o test drive non puoi proporre mezzi non disponibili.
+  \item \texttt{aggiornaVeicolo(...)}: aggiorna anagrafica e prezzo.
+  \item \texttt{eliminaVeicolo(targa)}: rimuove mezzo.
+  \item \texttt{getAllVeicoli()}: elenco completo per catalogo e gestione.
+\end{itemize}
+
+\subsubsection*{TestDriveDAO}
+\textbf{Cosa fa:}
+inserisce richieste test drive.
+
+\textbf{Perche esiste:}
+la prenotazione test drive e una transazione dedicata.
+
+\textbf{Spiegazione semplice:}
+quando scegli cliente, veicolo e data, questa classe salva la prenotazione.
+
+\textbf{Metodo:}
+\begin{itemize}
+  \item \texttt{richiediTestDrive(clienteId, targa, data)}.
+\end{itemize}
+
+\subsubsection*{VenditaDAO}
+\textbf{Cosa fa:}
+registra una vendita in database.
+
+\textbf{Perche esiste:}
+la vendita e evento critico: va tracciata con data, cliente, dipendente, prezzo.
+
+\textbf{Spiegazione semplice:}
+quando confermi la vendita in interfaccia, questa classe scrive la riga ufficiale nel DB.
+
+\textbf{Metodo:}
+\begin{itemize}
+  \item \texttt{effettuaVendita(targa, clienteId, dipendenteId, prezzoFinale)}.
+\end{itemize}
+
+\subsection{Package it.unina.prog.ui.common}
+
+\subsubsection*{UiSupport}
+\textbf{Cosa fa:}
+fornisce funzioni comuni per stile pannelli e gestione errori utente.
+
+\textbf{Perche esiste:}
+evita copia-incolla di codice grafico e messaggi d'errore in molti file.
+
+\textbf{Spiegazione semplice:}
+e la ``cassetta attrezzi'' condivisa della GUI.
+
+\textbf{Metodi con motivazione:}
+\begin{itemize}
+  \item \texttt{wrapTitled(panel, title)}: mette bordo con titolo uniforme. Perche: coerenza visiva.
+  \item \texttt{showErr(parent, ex)}: mostra errore standard. Perche: centralizzare UX degli errori.
+  \item \texttt{toUserMessage(ex)}: traduce errori tecnici in frasi comprensibili. Perche: utente non deve leggere stack trace.
+\end{itemize}
+
+\subsection{Package it.unina.prog.ui.model}
+
+\subsubsection*{UiModels}
+\textbf{Cosa fa:}
+contiene classi ``item'' per mostrare valori utili in combo box e liste.
+
+\textbf{Perche esiste:}
+se metti solo id o targa grezzi in una combo, l'esperienza utente peggiora.
+
+\textbf{Spiegazione semplice:}
+queste classi preparano etichette leggibili tipo ``Mario Rossi (3)'' o ``AB123CD - Yaris''.
+
+\textbf{Elementi:}
+\begin{itemize}
+  \item \texttt{ClienteItem}: tiene id e nome; \texttt{toString()} definisce testo mostrato.
+  \item \texttt{VeicoloItem}: tiene targa, modello e prezzo; \texttt{toString()} definisce testo mostrato.
+  \item \texttt{ClienteLogin}: contenitore cliente+password (supporto flussi login).
+\end{itemize}
+
+\subsection{Package it.unina.prog.ui.validation}
+
+\subsubsection*{InputValidator}
+\textbf{Cosa fa:}
+raccolta di validazioni comuni su email, telefono, targa, date.
+
+\textbf{Perche esiste:}
+la validazione ripetuta in piu pannelli genera bug e incoerenza; centralizzarla evita errori.
+
+\textbf{Spiegazione semplice:}
+invece di riscrivere gli stessi controlli ovunque, c'e una sola classe che li fa bene una volta.
+
+\textbf{Metodi e motivazione:}
+\begin{itemize}
+  \item \texttt{isValidEmail(email)}: impedisce email palesemente malformate.
+  \item \texttt{isValidPhone(phone)}: forza formato coerente (10 cifre).
+  \item \texttt{normalizePlate(plate)}: uniforma targa (trim+maiuscolo).
+  \item \texttt{isValidPlate(plate)}: blocca targhe con caratteri/spazi non ammessi.
+  \item \texttt{parseDateOrThrow(dateInput)}: converte stringa in data o lancia errore chiaro.
+  \item \texttt{requireTodayOrFuture(date)}: vieta date passate.
+\end{itemize}
+
+\subsection{Package it.unina.prog.ui}
+
+\subsubsection*{ConcessionarioFrame}
+\textbf{Cosa fa:}
+e la finestra principale e il coordinatore di tutta la navigazione.
+
+\textbf{Perche esiste:}
+serve un ``orchestratore'' che sappia quale schermata mostrare in base al login e allo stato sessione.
+
+\textbf{Spiegazione semplice:}
+pensa a un centralino: riceve accesso utente e lo instrada nella sezione giusta.
+
+\textbf{Metodi con motivazione e spiegazione:}
+\begin{itemize}
+  \item \texttt{ConcessionarioFrame()}: inizializza struttura base. Perche: impostare finestra una sola volta.
+  \item \texttt{createHeader()}: crea barra titolo/sessione/logout. Perche: info utente sempre visibili.
+  \item \texttt{createLoginPanel()}: costruisce form login e listener. Perche: ingresso unico app.
+  \item \texttt{buildDipendenteArea(id)}: genera tab operative dipendente. Perche: separare strumenti interni.
+  \item \texttt{buildClienteArea(cliente)}: genera tab cliente. Perche: limitare azioni ai permessi cliente.
+  \item \texttt{switchToLogin()}: torna alla schermata iniziale.
+  \item \texttt{switchToDipendente(dipendente)}: monta vista dipendente e aggiorna sessione.
+  \item \texttt{switchToCliente(cliente)}: monta vista cliente e aggiorna sessione.
+  \item \texttt{handleClienteLogin(email,password)}: valida input e autentica cliente.
+  \item \texttt{handleDipendenteLogin(idText,password)}: valida input e autentica dipendente.
+\end{itemize}
+
+\section{Pannelli cliente con spiegazione didattica}
+
+\subsection{CatalogoClientePanel}
+\textbf{Cosa fa:} mostra l'elenco dei veicoli in tabella.
+
+\textbf{Perche esiste:} il cliente deve poter consultare catalogo e disponibilita senza modificare dati.
+
+\textbf{Spiegazione semplice:} e una vetrina in sola lettura.
+
+\textbf{Chiamate importanti e motivo:}
+\begin{itemize}
+  \item \texttt{VeicoloDAO.getAllVeicoli()}: recupera dati aggiornati.
+  \item \texttt{DefaultTableModel}: struttura righe/colonne tabella.
+  \item \texttt{Runnable load}: permette refresh rapido senza duplicare codice.
+\end{itemize}
+
+\subsection{ProfiloClientePanel}
+\textbf{Cosa fa:} mostra e aggiorna email/telefono del cliente loggato.
+
+\textbf{Perche esiste:} il cliente deve poter mantenere aggiornati i propri contatti.
+
+\textbf{Spiegazione semplice:} e la sezione ``i miei dati''.
+
+\textbf{Elementi chiave e motivo:}
+\begin{itemize}
+  \item \texttt{validateEmailTelefono()}: evita salvataggi con dati invalidi.
+  \item SELECT profilo per riempire campi all'apertura.
+  \item UPDATE profilo al click su salva.
+\end{itemize}
+
+\subsection{TestDriveClientePanel}
+\textbf{Cosa fa:} permette prenotazione test drive lato cliente.
+
+\textbf{Perche esiste:} il test drive e azione principale prima dell'acquisto.
+
+\textbf{Spiegazione semplice:} il cliente sceglie veicolo+data e invia richiesta.
+
+\textbf{Chiamate chiave e motivo:}
+\begin{itemize}
+  \item \texttt{VeicoloDAO.getVeicoliDisponibili()}: solo mezzi prenotabili.
+  \item \texttt{InputValidator.parseDateOrThrow()} + \texttt{requireTodayOrFuture()}: evita errori data.
+  \item \texttt{TestDriveDAO.richiediTestDrive()}: salvataggio prenotazione.
+\end{itemize}
+
+\subsection{OperazioniClientePanel}
+\textbf{Cosa fa:} visualizza storico vendite e test drive del cliente.
+
+\textbf{Perche esiste:} trasparenza: il cliente deve vedere le proprie operazioni.
+
+\textbf{Spiegazione semplice:} e l'estratto conto delle attivita cliente.
+
+\textbf{Perche query dirette qui:}
+si tratta di viste aggregate con join e ordinamenti specifici, comode per report UI immediato.
+
+\section{Pannelli dipendente con spiegazione didattica}
+
+\subsection{ClientiPanel}
+\textbf{Cosa fa:} CRUD completo sui clienti.
+
+\textbf{Perche esiste:} i dipendenti devono registrare, correggere o rimuovere anagrafiche.
+
+\textbf{Spiegazione semplice:} e il ``gestionale clienti''.
+
+\textbf{Metodi/chiamate e motivo:}
+\begin{itemize}
+  \item \texttt{validateClienteInput(...)}: controlla campi obbligatori e coerenza.
+  \item \texttt{ClienteDAO.inserisci/aggiorna/elimina/getClienti}: operazioni base archivio clienti.
+\end{itemize}
+
+\subsection{VeicoliPanel}
+\textbf{Cosa fa:} CRUD veicoli + gestione marca non presente.
+
+\textbf{Perche esiste:} inventario veicoli e cuore del concessionario.
+
+\textbf{Spiegazione semplice:} e il ``magazzino'' auto/moto.
+
+\textbf{Metodi/chiamate e motivo:}
+\begin{itemize}
+  \item \texttt{validateVeicoloInput()}: blocca inserimenti sporchi.
+  \item \texttt{targaExistsIgnoringCaseAndSpaces()}: evita duplicati furbi (spazi/case).
+  \item \texttt{ensureMarcaExistsOrCreate()}: permette aggiunta marca al volo.
+  \item \texttt{VeicoloDAO.*}: CRUD veicoli.
+\end{itemize}
+
+\subsection{VenditaPanel}
+\textbf{Cosa fa:} registra vendita con dipendente corrente.
+
+\textbf{Perche esiste:} trasformare disponibilita in vendita registrata in modo tracciabile.
+
+\textbf{Spiegazione semplice:} e la cassa finale: scegli cliente e veicolo, confermi, la vendita entra nello storico.
+
+\textbf{Chiamate chiave:}
+\begin{itemize}
+  \item \texttt{VeicoloDAO.getVeicoliDisponibili()} e \texttt{ClienteDAO.getClienti()} per popolare combo.
+  \item \texttt{VenditaDAO.effettuaVendita(...)} per salvataggio definitivo.
+\end{itemize}
+
+\subsection{TestDrivePanel}
+\textbf{Cosa fa:} inserisce test drive da parte dipendente.
+
+\textbf{Perche esiste:} anche il personale interno deve poter registrare prenotazioni assistite.
+
+\textbf{Spiegazione semplice:} versione operatore della prenotazione test drive.
+
+\textbf{Chiamate:}
+\begin{itemize}
+  \item stesse del pannello cliente (veicoli disponibili, clienti, validazione data, insert test drive).
+\end{itemize}
+
+\subsection{OrdiniPanel}
+\textbf{Cosa fa:} mostra storico globale (vendite + test drive) e permette eliminazioni.
+
+\textbf{Perche esiste:} controllo amministrativo e correzione dati errati.
+
+\textbf{Spiegazione semplice:} e il ``registro generale'' del concessionario.
+
+\textbf{Chiamate e motivo:}
+\begin{itemize}
+  \item query JOIN per avere dati leggibili con nomi (non solo id).
+  \item DELETE per correggere record selezionati.
+\end{itemize}
+
+\section{Chiamate esterne ricorrenti (con motivazione)}
+
+\subsection{Swing/AWT}
+\textbf{Perche usate:} costruiscono interfaccia desktop nativa Java.
+
+\textbf{Spiegazione semplice:}
+\begin{itemize}
+  \item \texttt{JPanel}: contenitore di componenti.
+  \item \texttt{Layout} (Border/GridBag/Card/Flow): decide come disporre gli elementi.
+  \item \texttt{JButton/JTextField/JTable}: input e visualizzazione dati.
+  \item \texttt{JOptionPane}: popup messaggi/confirm.
+  \item \texttt{addActionListener}: reagisce al click utente.
+\end{itemize}
+
+\subsection{JDBC}
+\textbf{Perche usato:} e il ponte standard tra Java e SQL.
+
+\textbf{Spiegazione semplice:}
+\begin{enumerate}
+  \item apri connessione,
+  \item prepari query con parametri,
+  \item esegui,
+  \item leggi risultato,
+  \item chiudi risorse (automatico con try-with-resources).
+\end{enumerate}
+
+\subsection{Utility Java base}
+\textbf{Perche usate:}
+\begin{itemize}
+  \item parsing numeri/date: convertire testo input in tipi utili.
+  \item metodi stringa: pulizia e validazione input utente.
+\end{itemize}
+
+\section{Query SQL dirette nei panel: cosa fanno e perche}
+
+\subsection{ProfiloClientePanel}
+\textbf{Perche:} leggere e aggiornare profilo del cliente loggato.
+\begin{lstlisting}[style=sqlstyle,language=SQL]
+SELECT nome, tipo, email, telefono
+FROM Cliente
+WHERE id = ?;
+
+UPDATE Cliente
+SET email = ?, telefono = ?
+WHERE id = ?;
+\end{lstlisting}
+
+\subsection{VeicoliPanel}
+\textbf{Perche:} controllo duplicati targa, verifica marca, eventuale inserimento marca.
+\begin{lstlisting}[style=sqlstyle,language=SQL]
+SELECT 1
+FROM Veicolo
+WHERE UPPER(REPLACE(targa, ' ', '')) = UPPER(REPLACE(?, ' ', ''));
+
+SELECT 1
+FROM Marca
+WHERE LOWER(nome) = LOWER(?);
+
+INSERT INTO Marca (nome, nazione)
+VALUES (?, ?);
+\end{lstlisting}
+
+\subsection{OperazioniClientePanel}
+\textbf{Perche:} mostrare storico cliente con dati completi e ordinati.
+\begin{lstlisting}[style=sqlstyle,language=SQL]
+SELECT v.id, v.data, v.veicolo, v.prezzo_finale, d.nome AS dipendente
+FROM Vendita v
+JOIN Dipendente d ON v.dipendente = d.id
+WHERE v.cliente = ?
+ORDER BY v.data DESC;
+
+SELECT id, data, veicolo
+FROM TestDrive
+WHERE cliente = ?
+ORDER BY data DESC;
+\end{lstlisting}
+
+\subsection{OrdiniPanel}
+\textbf{Perche:} vista amministrativa globale + cancellazioni mirate.
+\begin{lstlisting}[style=sqlstyle,language=SQL]
+SELECT v.id, v.data, v.veicolo, c.nome, d.nome, v.prezzo_finale
+FROM Vendita v
+JOIN Cliente c ON v.cliente = c.id
+JOIN Dipendente d ON v.dipendente = d.id
+ORDER BY v.data DESC;
+
+SELECT t.id, t.data, c.nome, t.veicolo
+FROM TestDrive t
+JOIN Cliente c ON t.cliente = c.id
+ORDER BY t.data DESC;
+
+DELETE FROM Vendita WHERE id = ?;
+DELETE FROM TestDrive WHERE id = ?;
+\end{lstlisting}
+
+\section{Funzioni SQL, trigger e vincoli con motivazione}
+
+\subsection{Funzione get\_stato\_veicolo(targa)}
+\textbf{Cosa fa:}
+ritorna \texttt{venduto}, \texttt{non disponibile momentaneamente} o \texttt{disponibile}.
+
+\textbf{Perche esiste:}
+lo stato del mezzo dipende da regole dati (vendite/test drive), quindi e corretto calcolarlo nel DB.
+
+\textbf{Spiegazione semplice:}
+il database decide in autonomia lo stato reale del veicolo, cosi la UI non inventa regole diverse.
+
+\subsection{Trigger check\_veicolo\_disponibile su Vendita}
+\textbf{Cosa fa:} blocca la seconda vendita dello stesso veicolo.
+
+\textbf{Perche esiste:} evita incoerenza gravissima (veicolo venduto due volte).
+
+\textbf{Spiegazione semplice:} e un ``controllore automatico'' dentro il DB prima dell'inserimento.
+
+\subsection{Trigger check\_testdrive\_limite su TestDrive}
+\textbf{Cosa fa:} blocca oltre 3 test drive mensili per cliente.
+
+\textbf{Perche esiste:} regola di business imposta dal dominio.
+
+\textbf{Spiegazione semplice:} il DB conta prenotazioni del mese e stoppa la quarta.
+
+\subsection{Vincoli principali schema}
+\textbf{Perche esistono:}
+per impedire dati impossibili o incoerenti direttamente alla fonte.
+
+\textbf{Esempi spiegati:}
+\begin{itemize}
+  \item CHECK su tipo cliente/veicolo: evita valori fuori elenco.
+  \item UNIQUE su email cliente: evita duplicati identita.
+  \item FOREIGN KEY: collega tabelle in modo coerente.
+  \item ON DELETE CASCADE: elimina automaticamente dati figli collegati.
+\end{itemize}
+
+\section{Mappa completa delle chiamate (con perche)}
+\begin{enumerate}
+  \item \textbf{Avvio:} \texttt{Main.main()} $\rightarrow$ \texttt{MainApp.main()} $\rightarrow$ \texttt{ConcessionarioFrame()}.
+  Perche: separa ingresso tecnico e avvio GUI.
+
+  \item \textbf{Login cliente:} \texttt{handleClienteLogin()} $\rightarrow$ \texttt{ClienteDAO.autenticaCliente()} $\rightarrow$ \texttt{switchToCliente()}.
+  Perche: validazione input, verifica credenziali, apertura area corretta.
+
+  \item \textbf{Login dipendente:} \texttt{handleDipendenteLogin()} $\rightarrow$ \texttt{DipendenteDAO.autenticaDipendente()} $\rightarrow$ \texttt{switchToDipendente()}.
+  Perche: stesso principio del cliente ma con ruolo interno.
+
+  \item \textbf{Tab cliente} (profilo, catalogo, test drive, storico).
+  Perche: separa operazioni in blocchi semplici da capire.
+
+  \item \textbf{Tab dipendente} (clienti, veicoli, vendita, test drive, ordini).
+  Perche: strumenti operativi completi solo per personale autorizzato.
+\end{enumerate}
+
+\section{Perche sono stati deduplicati i doppioni}
+\textbf{Scelta:} pattern identici (esempio: struttura JDBC, listener Swing, refresh con \texttt{Runnable load}) sono spiegati una sola volta.
+
+\textbf{Perche:}
+\begin{itemize}
+  \item il documento resta studiabile,
+  \item si evita ripetizione inutile,
+  \item si capisce meglio la logica comune del progetto.
+\end{itemize}
+
+\textbf{Spiegazione semplice:}
+se dieci classi fanno la stessa cosa nello stesso modo, capire bene una volta basta per capirle tutte.
+
+\section{Glossario minimo per principianti}
+\begin{itemize}
+  \item \textbf{Classe}: modello/ricetta di un oggetto.
+  \item \textbf{Metodo}: azione che una classe puo eseguire.
+  \item \textbf{Oggetto}: istanza concreta di una classe.
+  \item \textbf{DAO}: classe che accede al database.
+  \item \textbf{Query}: istruzione SQL (SELECT, INSERT, UPDATE, DELETE).
+  \item \textbf{Trigger}: regola automatica del DB che scatta su eventi.
+  \item \textbf{GUI}: interfaccia grafica.
+  \item \textbf{CRUD}: Create, Read, Update, Delete.
+\end{itemize}
+
+\section{Conclusione}
+Questa versione aggiunge per ogni sezione e per ogni elemento principale:
+\begin{itemize}
+  \item spiegazione tecnica,
+  \item motivazione del perche esiste,
+  \item spiegazione didattica per chi non conosce Java.
+\end{itemize}
+
+In questo modo il file puo essere usato sia come documentazione tecnica sia come materiale di studio introduttivo.
+
+\newpage
+\section{Appendice molto approfondita: studio guidato file per file}
+Questa appendice rende la documentazione molto piu lunga e molto piu dettagliata.
+L'obiettivo non e solo dire \emph{cosa} fa il codice, ma anche spiegare \emph{come ragiona} e \emph{perche} ogni pezzo esiste.
+
+\subsection{1. File di avvio}
+
+\subsubsection*{Main.java}
+\textbf{Ruolo nel progetto:} e il punto di ingresso piu esterno, cioe il primo file che la macchina cerca quando parte il programma.
+
+\textbf{Perche serve davvero:} in molti progetti si usa una classe molto piccola come questa per avere un avvio semplice e uniforme. Se in futuro si volesse cambiare la vera classe di avvio, basterebbe modificare un solo punto.
+
+\textbf{Spiegazione per principianti:} immagina una porta d'ingresso di un edificio. Quando il programma parte, entra da qui e poi viene accompagnato verso l'app vera e propria.
+
+\textbf{Metodo presente:}
+\begin{itemize}
+  \item \texttt{main(String[] args)}: legge gli argomenti di avvio e li passa a \texttt{MainApp}.
+\end{itemize}
+
+\textbf{Motivazione della chiamata:} chiamare \texttt{MainApp.main(args)} rende esplicito che la logica di avvio reale non e duplicata, ma centralizzata.
+
+\subsubsection*{MainApp.java}
+\textbf{Ruolo nel progetto:} gestisce l'avvio grafico vero e proprio.
+
+\textbf{Perche serve davvero:} Swing richiede attenzione al thread dell'interfaccia. Se si apre la finestra nel modo sbagliato, l'app puo diventare instabile o comportarsi male.
+
+\textbf{Spiegazione per principianti:} questo file e come il direttore di scena: prepara tutto prima che la finestra sia visibile.
+
+\textbf{Passaggi interni spiegati uno per uno:}
+\begin{enumerate}
+  \item \texttt{SwingUtilities.invokeLater(...)}: dice a Java di costruire la finestra nel thread corretto.
+  \item \texttt{UIManager.setLookAndFeel(...)}: cambia l'aspetto dei pulsanti e delle finestre per renderlo simile al sistema operativo.
+  \item \texttt{new ConcessionarioFrame()}: crea la finestra principale.
+  \item \texttt{setVisible(true)}: rende la finestra visibile sullo schermo.
+\end{enumerate}
+
+\textbf{Perche queste chiamate sono importanti:} senza di esse la UI non partirebbe nel modo piu corretto e la prima impressione del programma sarebbe peggiore.
+
+\subsection{2. File di collegamento al database}
+
+\subsubsection*{DBManager.java}
+\textbf{Ruolo nel progetto:} e il punto unico in cui si apre la connessione al database.
+
+\textbf{Perche serve davvero:} il database e un servizio esterno; invece di ripetere la stessa configurazione in ogni classe, si centralizza tutto qui.
+
+\textbf{Spiegazione per principianti:} pensa a DBManager come al telefono del database. Ogni volta che il programma vuole chiedere qualcosa, deve prima fare questo numero.
+
+\textbf{Metodo presente:}
+\begin{itemize}
+  \item \texttt{getConnection()}: restituisce un oggetto \texttt{Connection} pronto per essere usato.
+\end{itemize}
+
+\textbf{Motivazione della scelta tecnica:}
+un metodo unico rende piu semplice modificare host, porta, nome database o credenziali senza cercare in tanti file diversi.
+
+\textbf{Cosa bisogna capire a livello base:}
+\begin{itemize}
+  \item \texttt{Connection} e la sessione attiva con il database.
+  \item Se la connessione e aperta, si possono inviare query SQL.
+  \item Se la connessione fallisce, il resto del programma non puo leggere o scrivere dati.
+\end{itemize}
+
+\subsection{3. Modelli dati}
+
+\subsubsection*{Cliente.java}
+\textbf{Ruolo nel progetto:} rappresenta il cliente come oggetto Java.
+
+\textbf{Perche serve davvero:} i dati letti dal database devono avere una forma leggibile dal codice. Un oggetto Cliente e piu utile di tante variabili sparse.
+
+\textbf{Spiegazione per principianti:} e come una scheda cartacea di un cliente, ma in versione digitale.
+
+\textbf{Costruttore e getter spiegati:}
+\begin{itemize}
+  \item \texttt{Cliente(...)}: crea il cliente con tutti i dati gia pronti.
+  \item \texttt{getId()}: restituisce l'identificativo numerico.
+  \item \texttt{getNome()}: restituisce il nome.
+  \item \texttt{getTipo()}: dice se il cliente e privato o azienda.
+  \item \texttt{getEmail()}: restituisce la mail.
+  \item \texttt{getTelefono()}: restituisce il numero di telefono.
+\end{itemize}
+
+\textbf{Perche i getter esistono:} servono a leggere i dati senza modificare direttamente i campi interni.
+
+\subsubsection*{Dipendente.java}
+\textbf{Ruolo nel progetto:} rappresenta il dipendente che puo entrare nel gestionale.
+
+\textbf{Perche serve davvero:} il login dipendente deve ottenere un oggetto che descrive l'utente autenticato, non solo un numero o una stringa.
+
+\textbf{Spiegazione per principianti:} e il badge del lavoratore: contiene chi e, che ruolo ha e quale password usa per accedere.
+
+\textbf{Metodi principali:}
+\begin{itemize}
+  \item Costruttore \texttt{Dipendente(...)}: crea il dipendente completo.
+  \item Getter dei campi: permettono alla GUI di mostrare nome, ruolo e id.
+\end{itemize}
+
+\textbf{Perche la password e nel modello:} il programma la usa nel login. In un progetto didattico questo e semplice da capire; in un progetto reale sarebbe meglio salvarla in modo sicuro.
+
+\subsubsection*{Veicolo.java}
+\textbf{Ruolo nel progetto:} rappresenta un mezzo disponibile nel catalogo.
+
+\textbf{Perche serve davvero:} il catalogo, le vendite e i test drive lavorano tutti sugli stessi dati veicolo.
+
+\textbf{Spiegazione per principianti:} e la scheda del veicolo: targa, marca, modello, tipo, prezzo e stato.
+
+\textbf{Metodi principali:}
+\begin{itemize}
+  \item Costruttore \texttt{Veicolo(...)}: crea il mezzo con tutti i dettagli.
+  \item Getter: restituiscono i singoli campi quando servono in tabelle o combo box.
+\end{itemize}
+
+\subsection{4. DAO: il ponte con il database}
+
+\subsubsection*{ClienteDAO.java}
+\textbf{Ruolo nel progetto:} si occupa di tutte le operazioni SQL sui clienti.
+
+\textbf{Perche serve davvero:} senza un DAO, la SQL finirebbe dentro la grafica, rendendo il codice confuso e difficile da correggere.
+
+\textbf{Spiegazione per principianti:} e il lavoratore che va a parlare con il database al posto dell'interfaccia grafica.
+
+\paragraph{inserisciCliente(nome, tipo, email, telefono, password)}
+\textbf{Cosa fa:} salva un nuovo cliente nel database.
+
+\textbf{Perche esiste:} quando il dipendente registra un cliente, questa funzione crea il record.
+
+\textbf{Spiegazione semplice:} e come compilare una nuova scheda cliente e metterla nell'archivio.
+
+\paragraph{getClienti()}
+\textbf{Cosa fa:} legge tutti i clienti presenti nel database.
+
+\textbf{Perche esiste:} serve per riempire tabelle e combo box.
+
+\textbf{Spiegazione semplice:} prende tutte le schede e le mette in una lista che Java puo usare.
+
+\paragraph{getClienteByEmail(email)}
+\textbf{Cosa fa:} cerca un cliente tramite email.
+
+\textbf{Perche esiste:} e utile per verificare se un cliente esiste gia oppure per recuperarlo rapidamente.
+
+\textbf{Spiegazione semplice:} e come cercare una persona usando la sua email invece del nome.
+
+\paragraph{autenticaCliente(email, password)}
+\textbf{Cosa fa:} verifica se email e password coincidono con un cliente reale.
+
+\textbf{Perche esiste:} il login cliente dipende da questa verifica.
+
+\textbf{Spiegazione semplice:} e il controllo all'ingresso: se i dati sono giusti, la porta si apre.
+
+\paragraph{aggiornaCliente(id, nome, tipo, email, telefono)}
+\textbf{Cosa fa:} modifica i dati del cliente senza cambiare la password.
+
+\textbf{Perche esiste:} spesso il cliente deve solo aggiornare contatti o nome, non la password.
+
+\textbf{Spiegazione semplice:} e come correggere una scheda gia esistente.
+
+\paragraph{aggiornaClienteConPassword(...)}
+\textbf{Cosa fa:} modifica i dati e anche la password.
+
+\textbf{Perche esiste:} serve quando il dipendente vuole cambiare tutto in un colpo solo.
+
+\textbf{Spiegazione semplice:} come aggiornare la scheda completa invece di una sola parte.
+
+\paragraph{eliminaCliente(id)}
+\textbf{Cosa fa:} cancella il cliente dal database.
+
+\textbf{Perche esiste:} a volte un record deve essere rimosso per errore, duplicato o richiesta amministrativa.
+
+\textbf{Spiegazione semplice:} toglie la scheda dall'archivio.
+
+\textbf{Chiamate comuni usate nel DAO e perche:}
+\begin{itemize}
+  \item \texttt{prepareStatement}: mette sicurezza e ordine nelle query.
+  \item \texttt{setString/setInt}: inserisce i valori reali al posto dei segnaposto \texttt{?}.
+  \item \texttt{executeQuery}: quando si legge.
+  \item \texttt{executeUpdate}: quando si scrive o si cancella.
+  \item \texttt{ResultSet}: contiene le righe lette dal database.
+\end{itemize}
+
+\subsubsection*{DipendenteDAO.java}
+\textbf{Ruolo nel progetto:} gestisce il login e la lettura dei dipendenti.
+
+\textbf{Perche serve davvero:} la logica di autenticazione deve essere separata dalla finestra di login.
+
+\textbf{Spiegazione semplice:} e il controllo documenti del lavoratore.
+
+\paragraph{getDipendenteById(id)}
+\textbf{Cosa fa:} cerca un dipendente nel database usando il suo numero identificativo.
+
+\textbf{Perche esiste:} il sistema interno usa l'ID invece dell'email.
+
+\textbf{Spiegazione semplice:} e come cercare una persona tramite numero tessera.
+
+\paragraph{autenticaDipendente(id, password)}
+\textbf{Cosa fa:} confronta password inserita e password salvata.
+
+\textbf{Perche esiste:} senza questa verifica, chiunque potrebbe entrare nel gestionale.
+
+\textbf{Spiegazione semplice:} se il tesserino e la parola segreta coincidono, il dipendente entra.
+
+\subsubsection*{VeicoloDAO.java}
+\textbf{Ruolo nel progetto:} gestisce i mezzi, il loro stato e la disponibilita.
+
+\textbf{Perche serve davvero:} tutte le schermate che mostrano veicoli dipendono da questa classe.
+
+\textbf{Spiegazione semplice:} e il magazzino digitale dei veicoli.
+
+\paragraph{inserisciVeicolo(targa, marca, modello, tipo, prezzo)}
+\textbf{Cosa fa:} inserisce un nuovo veicolo.
+
+\textbf{Perche esiste:} il dipendente deve aggiungere nuovi mezzi al catalogo.
+
+\textbf{Spiegazione semplice:} mette una nuova auto o moto nello scaffale del concessionario.
+
+\paragraph{getStatoVeicolo(targa)}
+\textbf{Cosa fa:} chiede al database se il veicolo risulta venduto, temporaneamente bloccato o libero.
+
+\textbf{Perche esiste:} lo stato non va inventato dalla grafica, ma calcolato secondo regole certe.
+
+\textbf{Spiegazione semplice:} domanda al database: ``questo mezzo si puo ancora usare o no?''.
+
+\paragraph{getVeicoliDisponibili()}
+\textbf{Cosa fa:} restituisce solo i veicoli prenotabili.
+
+\textbf{Perche esiste:} in vendita e test drive bisogna proporre solo mezzi disponibili.
+
+\textbf{Spiegazione semplice:} mostra solo quello che si puo davvero scegliere.
+
+\paragraph{aggiornaVeicolo(targa, marca, modello, tipo, prezzo)}
+\textbf{Cosa fa:} modifica i dati del mezzo.
+
+\textbf{Perche esiste:} prezzo o descrizione possono cambiare.
+
+\textbf{Spiegazione semplice:} corregge la scheda del veicolo.
+
+\paragraph{eliminaVeicolo(targa)}
+\textbf{Cosa fa:} elimina un veicolo.
+
+\textbf{Perche esiste:} serve quando un mezzo viene rimosso dal catalogo.
+
+\textbf{Spiegazione semplice:} toglie il mezzo dal magazzino.
+
+\paragraph{getAllVeicoli()}
+\textbf{Cosa fa:} legge tutti i veicoli e calcola lo stato.
+
+\textbf{Perche esiste:} il catalogo completo deve mostrare tutto, non solo i mezzi disponibili.
+
+\textbf{Spiegazione semplice:} e la lista completa di tutto il parco veicoli.
+
+\subsubsection*{TestDriveDAO.java}
+\textbf{Ruolo nel progetto:} salva le richieste di test drive.
+
+\textbf{Perche serve davvero:} il test drive e una vera operazione del sistema, non solo un messaggio a video.
+
+\textbf{Spiegazione semplice:} scrive nel database che un cliente vuole provare un mezzo in una certa data.
+
+\paragraph{richiediTestDrive(clienteId, targa, data)}
+\textbf{Cosa fa:} inserisce una riga nella tabella TestDrive.
+
+\textbf{Perche esiste:} la prenotazione va memorizzata e controllata.
+
+\textbf{Spiegazione semplice:} e come segnare su un registro che una prova e stata fissata.
+
+\subsubsection*{VenditaDAO.java}
+\textbf{Ruolo nel progetto:} salva una vendita ufficiale.
+
+\textbf{Perche serve davvero:} la vendita e l'evento finale piu importante di un concessionario.
+
+\textbf{Spiegazione semplice:} quando si conclude un acquisto, questa classe lascia la traccia nel database.
+
+\paragraph{effettuaVendita(targa, clienteId, dipendenteId, prezzoFinale)}
+\textbf{Cosa fa:} crea il record di vendita con la data corrente.
+
+\textbf{Perche esiste:} la vendita deve contenere chi ha comprato, chi ha venduto e a che prezzo.
+
+\textbf{Spiegazione semplice:} scrive il contratto finale in forma digitale.
+
+\subsection{5. Utility della GUI}
+
+\subsubsection*{UiSupport.java}
+\textbf{Ruolo nel progetto:} fornisce funzioni visive e per errori comuni.
+
+\textbf{Perche serve davvero:} la stessa grafica e lo stesso modo di mostrare errori devono essere coerenti in tutto il programma.
+
+\textbf{Spiegazione semplice:} e una piccola scatola degli attrezzi da usare ovunque.
+
+\paragraph{wrapTitled(panel, title)}
+\textbf{Cosa fa:} mette un bordo con titolo al pannello.
+
+\textbf{Perche esiste:} aiuta a separare visivamente le aree della finestra.
+
+\textbf{Spiegazione semplice:} e come mettere un'etichetta sopra una scatola.
+
+\paragraph{showErr(parent, ex)}
+\textbf{Cosa fa:} mostra un popup di errore.
+
+\textbf{Perche esiste:} l'utente deve capire che qualcosa e andato storto senza leggere dettagli tecnici troppo difficili.
+
+\textbf{Spiegazione semplice:} fa comparire una finestra che dice che c'e stato un problema.
+
+\paragraph{toUserMessage(ex)}
+\textbf{Cosa fa:} converte alcuni errori tecnici in messaggi piu semplici.
+
+\textbf{Perche esiste:} il database puo restituire messaggi poco chiari; questa funzione li traduce in modo comprensibile.
+
+\textbf{Spiegazione semplice:} trasforma il linguaggio ``da tecnico'' in linguaggio normale.
+
+\subsubsection*{UiModels.java}
+\textbf{Ruolo nel progetto:} aiuta le combo box a mostrare testi leggibili.
+
+\textbf{Perche serve davvero:} se una combo mostra solo numeri, l'utente si confonde facilmente.
+
+\textbf{Spiegazione semplice:} trasforma dati grezzi in etichette facili da leggere.
+
+\paragraph{ClienteItem}
+\textbf{Cosa fa:} conserva id e nome.
+
+\textbf{Perche esiste:} la combo del cliente deve mostrare un testo utile, non solo l'id.
+
+\textbf{Spiegazione semplice:} mostra qualcosa come ``Mario Rossi (3)''.
+
+\paragraph{VeicoloItem}
+\textbf{Cosa fa:} conserva targa, modello e prezzo.
+
+\textbf{Perche esiste:} in una lista di scelta e piu utile vedere anche il modello del mezzo.
+
+\textbf{Spiegazione semplice:} e come leggere una targhetta con il nome del mezzo.
+
+\paragraph{ClienteLogin}
+\textbf{Cosa fa:} conserva un cliente e la password usata nel login.
+
+\textbf{Perche esiste:} e un piccolo contenitore utile nei flussi di autenticazione.
+
+\textbf{Spiegazione semplice:} mette insieme chi prova ad entrare e la chiave che usa.
+
+\subsubsection*{InputValidator.java}
+\textbf{Ruolo nel progetto:} controlla la correttezza degli input prima del salvataggio.
+
+\textbf{Perche serve davvero:} senza validazione, il database riceverebbe dati sbagliati e l'app diventerebbe meno affidabile.
+
+\textbf{Spiegazione semplice:} e il professore severo che controlla se quello che scrivi e scritto bene.
+
+\paragraph{isValidEmail(email)}
+\textbf{Cosa fa:} controlla se l'email ha una forma accettabile.
+
+\textbf{Perche esiste:} evita errori evidenti come email senza @ o con spazi.
+
+\textbf{Spiegazione semplice:} verifica che l'indirizzo sembri davvero una mail.
+
+\paragraph{isValidPhone(phone)}
+\textbf{Cosa fa:} controlla il numero di telefono.
+
+\textbf{Perche esiste:} serve un formato consistente.
+
+\textbf{Spiegazione semplice:} controlla che il numero sia fatto come previsto.
+
+\paragraph{normalizePlate(plate)}
+\textbf{Cosa fa:} toglie spazi esterni e converte in maiuscolo.
+
+\textbf{Perche esiste:} le targhe devono essere confrontate in modo uniforme.
+
+\textbf{Spiegazione semplice:} rende tutte le targhe scritte nello stesso modo.
+
+\paragraph{isValidPlate(plate)}
+\textbf{Cosa fa:} verifica che la targa abbia caratteri ammessi.
+
+\textbf{Perche esiste:} evita lettere strane, simboli o spazi sbagliati.
+
+\textbf{Spiegazione semplice:} controlla che la targa assomigli davvero a una targa.
+
+\paragraph{parseDateOrThrow(dateInput)}
+\textbf{Cosa fa:} trasforma una stringa in data oppure lancia un errore chiaro.
+
+\textbf{Perche esiste:} l'utente scrive date come testo, ma il programma ha bisogno di un oggetto data.
+
+\textbf{Spiegazione semplice:} traduce una data scritta a mano in una data che Java capisce.
+
+\paragraph{requireTodayOrFuture(date)}
+\textbf{Cosa fa:} impedisce di usare date passate.
+
+\textbf{Perche esiste:} un test drive non puo essere prenotato in un giorno gia passato.
+
+\textbf{Spiegazione semplice:} evita di viaggiare nel tempo all'indietro.
+
+\subsection{6. Finestra principale e navigazione}
+
+\subsubsection*{ConcessionarioFrame.java}
+\textbf{Ruolo nel progetto:} coordina login, logout, viste dipendente e viste cliente.
+
+\textbf{Perche serve davvero:} in un gestionale grafico serve un unico posto che sappia cambiare schermata in base all'utente.
+
+\textbf{Spiegazione semplice:} e il cervello della finestra principale.
+
+\paragraph{ConcessionarioFrame()}
+\textbf{Cosa fa:} prepara finestra, header e area login.
+
+\textbf{Perche esiste:} cosi la struttura base viene costruita una sola volta.
+
+\textbf{Spiegazione semplice:} costruisce la casa prima che qualcuno ci entri.
+
+\paragraph{createHeader()}
+\textbf{Cosa fa:} crea la barra superiore con titolo e logout.
+
+\textbf{Perche esiste:} l'utente deve sempre capire dove si trova e chi e loggato.
+
+\textbf{Spiegazione semplice:} e il cartello sopra la porta.
+
+\paragraph{createLoginPanel()}
+\textbf{Cosa fa:} crea il modulo di accesso con ruolo, credenziali e note.
+
+\textbf{Perche esiste:} e il punto in cui l'utente entra nell'app.
+
+\textbf{Spiegazione semplice:} e il modulo d'ingresso.
+
+\paragraph{buildDipendenteArea(id)}
+\textbf{Cosa fa:} crea i tab del dipendente.
+
+\textbf{Perche esiste:} il personale interno ha piu funzioni da gestire.
+
+\textbf{Spiegazione semplice:} apre il pannello di lavoro del dipendente.
+
+\paragraph{buildClienteArea(cliente)}
+\textbf{Cosa fa:} crea i tab del cliente.
+
+\textbf{Perche esiste:} un cliente non deve vedere strumenti amministrativi inutili.
+
+\textbf{Spiegazione semplice:} mostra la parte dell'app che il cliente puo usare.
+
+\paragraph{switchToLogin()}
+\textbf{Cosa fa:} torna al login.
+
+\textbf{Perche esiste:} dopo il logout bisogna ripulire la sessione.
+
+\textbf{Spiegazione semplice:} riporta l'app alla porta d'ingresso.
+
+\paragraph{switchToDipendente(dipendente)}
+\textbf{Cosa fa:} mostra l'area dipendente e aggiorna la sessione.
+
+\textbf{Perche esiste:} dopo il login bisogna portare l'utente nella zona corretta.
+
+\textbf{Spiegazione semplice:} accompagna il lavoratore nel suo ufficio digitale.
+
+\paragraph{switchToCliente(cliente)}
+\textbf{Cosa fa:} mostra l'area cliente e aggiorna la sessione.
+
+\textbf{Perche esiste:} il cliente deve vedere solo le sue funzioni.
+
+\textbf{Spiegazione semplice:} porta il cliente nella sua area riservata.
+
+\paragraph{handleClienteLogin(email,password)}
+\textbf{Cosa fa:} controlla i campi e prova l'autenticazione cliente.
+
+\textbf{Perche esiste:} cosi si valida l'input prima di parlare con il database.
+
+\textbf{Spiegazione semplice:} prima guarda se i dati hanno senso, poi verifica se l'utente esiste.
+
+\paragraph{handleDipendenteLogin(idText,password)}
+\textbf{Cosa fa:} controlla i campi e prova l'autenticazione dipendente.
+
+\textbf{Perche esiste:} l'ID deve essere numerico e la password non vuota.
+
+\textbf{Spiegazione semplice:} e il controllo ingresso per chi lavora nel concessionario.
+
+\subsection{7. Pannelli cliente}
+
+\subsubsection*{CatalogoClientePanel.java}
+\textbf{Cosa fa:} mostra il catalogo completo.
+
+\textbf{Perche esiste:} il cliente deve poter guardare cosa offre il concessionario.
+
+\textbf{Spiegazione semplice:} e una vetrina digitale.
+
+\textbf{Comportamento interno spiegato:}
+\begin{itemize}
+  \item crea una tabella con colonne leggibili,
+  \item chiama \texttt{VeicoloDAO.getAllVeicoli()},
+  \item ricarica i dati quando si preme refresh.
+\end{itemize}
+
+\subsubsection*{ProfiloClientePanel.java}
+\textbf{Cosa fa:} permette di leggere e modificare il profilo del cliente.
+
+\textbf{Perche esiste:} le informazioni di contatto possono cambiare.
+
+\textbf{Spiegazione semplice:} e la pagina dei tuoi dati personali.
+
+\textbf{Passo per passo:}
+\begin{enumerate}
+  \item apre il profilo dal database,
+  \item mostra i campi,
+  \item controlla email e telefono,
+  \item salva le modifiche.
+\end{enumerate}
+
+\subsubsection*{TestDriveClientePanel.java}
+\textbf{Cosa fa:} prenota un test drive per il cliente loggato.
+
+\textbf{Perche esiste:} il test drive e una funzione tipica del cliente.
+
+\textbf{Spiegazione semplice:} scegli un veicolo, scegli una data, chiedi di provarlo.
+
+\textbf{Perche servono le validazioni:}
+senza controllo data si potrebbero inserire richieste sbagliate o impossibili.
+
+\subsubsection*{OperazioniClientePanel.java}
+\textbf{Cosa fa:} mostra le vendite e i test drive del cliente.
+
+\textbf{Perche esiste:} l'utente deve poter rivedere la propria cronologia.
+
+\textbf{Spiegazione semplice:} e un archivio personale delle cose gia fatte.
+
+\subsection{8. Pannelli dipendente}
+
+\subsubsection*{ClientiPanel.java}
+\textbf{Cosa fa:} gestisce i clienti in modo completo.
+
+\textbf{Perche esiste:} i dipendenti devono poter inserire, modificare e cancellare clienti.
+
+\textbf{Spiegazione semplice:} e il foglio di lavoro dei clienti.
+
+\textbf{Comportamento da studiare:}
+\begin{itemize}
+  \item la tabella viene popolata da DAO,
+  \item la selezione di una riga riempie i campi,
+  \item il salvataggio controlla i dati,
+  \item l'eliminazione chiede conferma.
+\end{itemize}
+
+\subsubsection*{VeicoliPanel.java}
+\textbf{Cosa fa:} gestisce il parco veicoli.
+
+\textbf{Perche esiste:} senza questo pannello il concessionario non potrebbe amministrare auto e moto.
+
+\textbf{Spiegazione semplice:} e il cruscotto di tutto il magazzino.
+
+\textbf{Passi importanti:}
+\begin{enumerate}
+  \item controlla la targa,
+  \item controlla la marca,
+  \item se la marca manca chiede la nazione,
+  \item salva o aggiorna il mezzo,
+  \item rinfresca la tabella.
+\end{enumerate}
+
+\subsubsection*{VenditaPanel.java}
+\textbf{Cosa fa:} registra una vendita con cliente e veicolo scelti.
+
+\textbf{Perche esiste:} e il punto operativo dove una trattativa diventa vendita vera.
+
+\textbf{Spiegazione semplice:} come chiudere un affare e scriverlo nel libro contabile.
+
+\subsubsection*{TestDrivePanel.java}
+\textbf{Cosa fa:} fa prenotare test drive anche al personale.
+
+\textbf{Perche esiste:} a volte la prenotazione viene inserita dal dipendente per conto del cliente.
+
+\textbf{Spiegazione semplice:} e la versione interna del pannello test drive.
+
+\subsubsection*{OrdiniPanel.java}
+\textbf{Cosa fa:} mostra tutte le vendite e i test drive e permette cancellazioni.
+
+\textbf{Perche esiste:} l'amministrazione deve controllare lo storico completo.
+
+\textbf{Spiegazione semplice:} e la cronologia generale del concessionario.
+
+\subsection{9. SQL, schema, trigger e regole}
+
+\subsubsection*{Tabelle del database}
+\textbf{Cosa fanno:} conservano i dati permanenti.
+
+\textbf{Perche esistono:} senza tabelle non ci sarebbe memoria stabile delle operazioni.
+
+\textbf{Spiegazione semplice:} sono gli archivi del concessionario.
+
+\paragraph{Marca}
+contiene nome e nazione della marca.
+
+\paragraph{Cliente}
+contiene i clienti, il tipo e la password.
+
+\paragraph{Dipendente}
+contiene i dipendenti e la password.
+
+\paragraph{Veicolo}
+contiene i mezzi e la loro marca.
+
+\paragraph{Vendita}
+contiene le vendite gia effettuate.
+
+\paragraph{TestDrive}
+contiene le prenotazioni dei test drive.
+
+\subsubsection*{Funzione get\_stato\_veicolo}
+\textbf{Cosa fa:} decide lo stato del mezzo.
+
+\textbf{Perche esiste:} la disponibilita dipende da regole e storici, non solo dal dato anagrafico.
+
+\textbf{Spiegazione semplice:} il database controlla se il mezzo e gia stato venduto o impegnato oggi.
+
+\subsubsection*{Trigger di vendita}
+\textbf{Cosa fa:} impedisce vendite doppie dello stesso veicolo.
+
+\textbf{Perche esiste:} un veicolo non puo essere venduto due volte.
+
+\textbf{Spiegazione semplice:} e un blocco automatico di sicurezza.
+
+\subsubsection*{Trigger test drive}
+\textbf{Cosa fa:} limita il numero mensile di test drive.
+
+\textbf{Perche esiste:} protegge la regola di business del concessionario.
+
+\textbf{Spiegazione semplice:} evita che un cliente prenoti troppe prove nello stesso mese.
+
+\subsection{10. Lettura completa del flusso applicativo}
+
+\textbf{Percorso del cliente:}
+\begin{enumerate}
+  \item entra dalla finestra di login,
+  \item inserisce email e password,
+  \item il programma controlla i dati,
+  \item il cliente viene portato nella propria area,
+  \item puo vedere catalogo, profilo, test drive e storico.
+\end{enumerate}
+
+\textbf{Percorso del dipendente:}
+\begin{enumerate}
+  \item entra dalla finestra di login,
+  \item inserisce id e password,
+  \item il programma controlla i dati,
+  \item il dipendente viene portato nell'area gestionale,
+  \item puo lavorare su clienti, veicoli, vendite, test drive e ordini.
+\end{enumerate}
+
+\textbf{Perche questa distinzione e utile:}
+mantiene il programma semplice da capire e separa bene i permessi.
+
+\subsection{11. Concetti da ricordare durante lo studio}
+\begin{itemize}
+  \item Una classe non e un oggetto: la classe e il modello, l'oggetto e il risultato concreto.
+  \item Un metodo non salva dati da solo: svolge una azione precisa.
+  \item Il DAO non mostra la grafica: parla con il database.
+  \item La GUI non dovrebbe contenere SQL complessa se non strettamente necessario.
+  \item Il DB non e solo memoria: e anche controllo delle regole.
+\end{itemize}
+
+\subsection{12. Lettura didattica finale per chi non sa Java}
+Se devi spiegare questo progetto a voce, puoi farlo cosi:
+\begin{enumerate}
+  \item Il programma si apre da una piccola classe iniziale.
+  \item Questa classe lancia la finestra principale.
+  \item La finestra mostra un login.
+  \item In base al ruolo, l'utente entra in una parte diversa dell'app.
+  \item Ogni pulsante chiama un metodo.
+  \item I metodi o controllano i dati o parlano con il database.
+  \item Il database applica anche regole proprie, come limiti e blocchi.
+\end{enumerate}
+
+\textbf{Perche questa sequenza e importante:} capire il flusso generale rende piu facile capire ogni singolo file.
+
+\subsection{13. Lettura finale delle motivazioni progettuali}
+\begin{itemize}
+  \item Si usa Java per avere un'app desktop strutturata e portabile.
+  \item Si usa Swing per costruire finestre e componenti grafici.
+  \item Si usa JDBC per collegarsi a PostgreSQL.
+  \item Si usano DAO per separare SQL e interfaccia.
+  \item Si usano model per rappresentare i dati.
+  \item Si usano utility per non ripetere codice.
+  \item Si usano trigger e funzioni SQL per proteggere le regole fondamentali.
+\end{itemize}
+
+\textbf{Spiegazione semplice:} il progetto e organizzato come una piccola azienda digitale: c'e chi mostra la finestra, chi fa il lavoro tecnico, chi conserva i dati e chi controlla che le regole siano rispettate.
+
+\newpage
+\section{Estensione avanzata richiesta: spiegazione molto piu approfondita}
+Questa sezione e stata aggiunta per rendere la documentazione piu lunga, piu tecnica e piu didattica.
+L'obiettivo e spiegare:
+\begin{itemize}
+  \item cos'e il progetto in termini architetturali e operativi;
+  \item cos'e Swing in modo piu serio (non solo definizione breve);
+  \item cos'e JDBC con focus pratico su questa codebase;
+  \item perche vengono usate API e simboli specifici (con riferimenti file/riga);
+  \item tutti gli import usati nei file Java, indicando il motivo del loro uso.
+\end{itemize}
+
+\subsection{Che cos'e davvero questo progetto (livello architetturale)}
+Il progetto e un gestionale desktop Java per concessionario auto/moto con due ruoli applicativi:
+\texttt{cliente} e \texttt{dipendente}.
+
+Dal punto di vista architetturale non e un monolite disordinato: adotta una separazione chiara in livelli.
+\begin{enumerate}
+  \item \textbf{UI Layer (Swing)}: contiene finestra principale e pannelli; gestisce input utente, tabelle, pulsanti, feedback.
+  \item \textbf{Application/Domain Layer leggero}: contiene le decisioni operative immediate (validazioni, scelta del flusso login, aggiornamento viste).
+  \item \textbf{Data Access Layer (DAO + JDBC)}: isola le query SQL, mappa risultati in oggetti Java, scrive/legge il database.
+  \item \textbf{Database Layer (PostgreSQL + trigger/funzioni)}: custodisce integrita, regole vincolanti e persistenza dei dati.
+\end{enumerate}
+
+Il valore didattico principale e che mostra in un progetto piccolo/medio una divisione pulita delle responsabilita:
+la UI non e obbligata a conoscere i dettagli SQL e i DAO non devono conoscere la logica grafica della finestra.
+
+\subsection{Che cos'e Swing, spiegato bene e collegato al codice}
+Swing e il toolkit grafico classico di Java per applicazioni desktop.
+Nel progetto viene usato in modalita tipica enterprise didattica:
+\begin{itemize}
+  \item una \texttt{JFrame} principale che coordina;
+  \item tanti \texttt{JPanel} specializzati;
+  \item layout manager per comporre schermate flessibili;
+  \item listener evento per reagire alle azioni utente;
+  \item modelli tabellari per separare dati e presentazione.
+\end{itemize}
+
+\textbf{Perche Swing e adatto qui:}
+\begin{itemize}
+  \item non richiede browser o server web;
+  \item permette form complessi, tabelle e workflow amministrativi;
+  \item integra bene JDBC in applicazioni standalone;
+  \item e coerente con un progetto universitario di POO + DB.
+\end{itemize}
+
+\textbf{Componenti Swing/AWT chiave con uso concreto nel progetto:}
+\begin{longtable}{p{0.19\textwidth} p{0.31\textwidth} p{0.42\textwidth}}
+\toprule
+\textbf{Componente} & \textbf{Dove (file:riga)} & \textbf{Perche viene usato} \\
+\midrule
+\endhead
+\texttt{JFrame} & \texttt{ui/ConcessionarioFrame.java} (classe principale) & Finestra contenitore dell'intera applicazione.
+\\
+\texttt{JPanel} & \texttt{ui/ConcessionarioFrame.java:28,43,54,80,124,160,173} e in tutti i pannelli sotto \texttt{ui/panels/*} & Unita base di composizione: ogni area funzionale e un pannello riutilizzabile.
+\\
+\texttt{CardLayout} & \texttt{ui/ConcessionarioFrame.java:27} & Cambio vista login/cliente/dipendente senza aprire nuove finestre.
+\\
+\texttt{JTabbedPane} & \texttt{ui/ConcessionarioFrame.java:153,167}; \texttt{ui/panels/customer/OperazioniClientePanel.java:20}; \texttt{ui/panels/employee/OrdiniPanel.java:21} & Organizza funzionalita in schede tematiche mantenendo la stessa finestra.
+\\
+\texttt{FlowLayout} & \texttt{ui/ConcessionarioFrame.java:69,124}; pannelli operativi (es. \texttt{employee/VeicoliPanel.java:54}, \texttt{customer/TestDriveClientePanel.java:34}) & Disposizione lineare dei pulsanti nelle barre azioni.
+\\
+\texttt{GridBagLayout} & \texttt{ui/ConcessionarioFrame.java:80,83}; vari pannelli form & Layout a griglia flessibile per form con etichette/campi.
+\\
+\texttt{JButton} & \texttt{ui/ConcessionarioFrame.java:30,123}; in tutti i pannelli operativi & Punto di attivazione esplicito dei casi d'uso (salva, aggiorna, elimina, conferma).
+\\
+\texttt{addActionListener} & \texttt{ui/ConcessionarioFrame.java:67,103,134}; numerose righe nei pannelli (es. \texttt{employee/VeicoliPanel.java:102,118,136,154,155}) & Collega l'evento click alla logica applicativa.
+\\
+\bottomrule
+\end{longtable}
+
+\subsection{Che cos'e JDBC, spiegato bene e collegato al codice}
+JDBC e l'API standard Java per dialogare con database relazionali.
+Nel progetto si vede il ciclo completo:
+\begin{enumerate}
+  \item apertura connessione;
+  \item preparazione query (spesso parametrizzate);
+  \item esecuzione;
+  \item lettura del risultato;
+  \item chiusura risorse con \texttt{try-with-resources}.
+\end{enumerate}
+
+\textbf{Perche e importante didatticamente:}
+\begin{itemize}
+  \item fa vedere separazione tra SQL e UI;
+  \item riduce memory leak grazie alla chiusura automatica;
+  \item rende esplicito il mapping \texttt{ResultSet -> oggetti model}.
+\end{itemize}
+
+\subsection{API/simboli richiesti: dove sono usati e perche}
+In tabella seguente i duplicati identici sono compressi.
+Quando la stessa API e usata con scopi diversi, i casi sono separati esplicitamente.
+
+\begin{longtable}{p{0.18\textwidth} p{0.33\textwidth} p{0.41\textwidth}}
+\toprule
+\textbf{Simbolo/API} & \textbf{Riferimenti (file:riga)} & \textbf{Motivazione d'uso nel progetto} \\
+\midrule
+\endhead
+\texttt{getConnection()} & \texttt{DBManager.java:12}; implementazione reale \texttt{DBManager.java:13} con \texttt{DriverManager.getConnection(...)} & Centralizza l'apertura connessioni DB e impedisce duplicazione di URL/credenziali.
+\\
+\texttt{DBManager.getConnection} & DAO: \texttt{dao/ClienteDAO.java:17,31,49,69,93,106,120}; \texttt{dao/DipendenteDAO.java:17}; \texttt{dao/VeicoloDAO.java:17,30,45,68,81,91}; \texttt{dao/TestDriveDAO.java:12}; \texttt{dao/VenditaDAO.java:12}; UI con query diretta: \texttt{employee/OrdiniPanel.java:55,105,135}, \texttt{employee/VeicoliPanel.java:197,233,245}, \texttt{customer/ProfiloClientePanel.java:54,77}, \texttt{customer/OperazioniClientePanel.java:55} & Accesso uniforme al database in tutti i casi d'uso: CRUD clienti/veicoli, autenticazione, storico, vendite e test drive.
+\\
+\texttt{SQLException} & Import e firma in \texttt{DBManager.java:5,12}; in tutti i DAO (es. \texttt{ClienteDAO.java:9}); nei metodi panel dove servono query & Propagazione formale degli errori SQL per gestirli in UI con messaggi utente coerenti.
+\\
+\texttt{createStatement()} & \texttt{dao/ClienteDAO.java:32}; \texttt{dao/VeicoloDAO.java:46,92}; \texttt{employee/OrdiniPanel.java:55} & Usato quando non servono parametri in input (SELECT di lettura/reportistica).
+\\
+\texttt{Statement} & Import in \texttt{dao/ClienteDAO.java:10}, \texttt{dao/VeicoloDAO.java:10}, \texttt{employee/OrdiniPanel.java:11} & Permette query statiche semplici per caricamento liste o viste aggregate.
+\\
+\texttt{getString(...)} su \texttt{ResultSet} & Esempi: \texttt{dao/ClienteDAO.java:37-40,56-59,76,82-85}; \texttt{dao/DipendenteDAO.java:24-26}; \texttt{dao/VeicoloDAO.java:35,49,54-56,95,99-101}; \texttt{employee/OrdiniPanel.java:60-63,72-74}; \texttt{customer/ProfiloClientePanel.java:61-64}; \texttt{customer/OperazioniClientePanel.java:64-65,67,77-78} & Estrae colonne testuali (o date rese stringa in query) e alimenta model Java o tabelle Swing.
+\\
+\texttt{FlowLayout} & \texttt{ui/ConcessionarioFrame.java:69,124}; \texttt{customer/CatalogoClientePanel.java:18}; \texttt{customer/TestDriveClientePanel.java:34}; \texttt{customer/ProfiloClientePanel.java:43}; \texttt{employee/ClientiPanel.java} (toolbar), \texttt{employee/VeicoliPanel.java:54}, \texttt{employee/TestDrivePanel.java:40}, \texttt{employee/OrdiniPanel.java:44} & Layout semplice per barre pulsanti allineate e facilmente leggibili.
+\\
+\texttt{JPanel} & Dichiarato/istanziato in tutta la UI, es. \texttt{ui/ConcessionarioFrame.java:28,43,54,80,124,160,173} & Elemento base per suddividere UI in blocchi indipendenti e riusabili.
+\\
+\texttt{actions} (variabile pannello pulsanti) & \texttt{ui/ConcessionarioFrame.java:124-128}; \texttt{customer/TestDriveClientePanel.java:34-39}; \texttt{customer/ProfiloClientePanel.java:43-47}; \texttt{employee/VeicoliPanel.java:54-63}; \texttt{employee/TestDrivePanel.java:40-45} & Convenzione locale per raggruppare pulsanti di comando in una toolbar coerente.
+\\
+\texttt{JButton} & \texttt{ui/ConcessionarioFrame.java:30,123}; uso diffuso nei pannelli (refresh/salva/elimina/conferma) & Trigger esplicito delle azioni utente.
+\\
+\texttt{loginBtn} & \texttt{ui/ConcessionarioFrame.java:123,126,134} & Pulsante di accesso: definizione, inserimento nel pannello azioni, bind al listener di login.
+\\
+\texttt{UiSupport} & Definizione \texttt{ui/common/UiSupport.java:6}; uso in \texttt{ui/ConcessionarioFrame.java:7,83,143} e in quasi tutti i pannelli & Standardizza look dei blocchi titolati e gestione errori in popup.
+\\
+\texttt{handleDipendenteLogin} & Definizione \texttt{ui/ConcessionarioFrame.java:227}; invocazione nel routing login \texttt{ui/ConcessionarioFrame.java:140} & Incapsula validazione ID/password dipendente + autenticazione DAO + switch vista.
+\\
+\texttt{equalsIgnoreCase} & \texttt{ui/ConcessionarioFrame.java:105,137} & Confronto robusto del ruolo selezionato (evita problemi maiuscole/minuscole).
+\\
+\texttt{addActionListener} & \texttt{ui/ConcessionarioFrame.java:67,103,134}; molti esempi nei pannelli cliente/dipendente & Meccanismo evento-azione di Swing per comportamento reattivo della GUI.
+\\
+\texttt{JTabbedPane} & \texttt{ui/ConcessionarioFrame.java:153,167}; \texttt{customer/OperazioniClientePanel.java:20}; \texttt{employee/OrdiniPanel.java:21} & Gestione di sotto-sezioni in tab senza moltiplicare finestre.
+\\
+\bottomrule
+\end{longtable}
+
+\subsection{Stesso simbolo, motivi diversi: casi esplicitati}
+Di seguito gli esempi richiesti in cui lo stesso costrutto appare in contesti differenti.
+
+\begin{longtable}{p{0.22\textwidth} p{0.31\textwidth} p{0.39\textwidth}}
+\toprule
+\textbf{Costrutto} & \textbf{Contesto} & \textbf{Differenza di scopo} \\
+\midrule
+\endhead
+\texttt{createStatement()} & \texttt{dao/ClienteDAO.java:32}, \texttt{dao/VeicoloDAO.java:46,92} & Caricamento liste standard (clienti/veicoli) senza parametri runtime.
+\\
+\texttt{createStatement()} & \texttt{employee/OrdiniPanel.java:55} & Query aggregate con JOIN per vista amministrativa (storico ordini globale).
+\\
+\texttt{JTabbedPane} & \texttt{ui/ConcessionarioFrame.java:153,167} & Navigazione macro tra funzionalita principali per ruolo.
+\\
+\texttt{JTabbedPane} & \texttt{employee/OrdiniPanel.java:21}, \texttt{customer/OperazioniClientePanel.java:20} & Suddivisione interna di uno stesso pannello in sotto-viste omogenee.
+\\
+\texttt{addActionListener} & \texttt{ui/ConcessionarioFrame.java:134} su \texttt{loginBtn} & Orchestrazione autenticazione e scelta flusso ruolo.
+\\
+\texttt{addActionListener} & \texttt{employee/VeicoliPanel.java:102,118,136,154,155} & Comandi CRUD multipli sul catalogo veicoli.
+\\
+\bottomrule
+\end{longtable}
+
+\subsection{Mappa completa import usati, file per file}
+In questa sezione ogni file Java viene coperto.
+Se un file non ha import, viene indicato esplicitamente.
+
+\subsubsection*{Package \texttt{it.unina.prog}}
+\paragraph{\texttt{DBManager.java}}
+\begin{itemize}
+  \item \texttt{java.sql.Connection} (riga 3): tipo di ritorno del canale DB.
+  \item \texttt{java.sql.DriverManager} (riga 4): factory JDBC per apertura connessione.
+  \item \texttt{java.sql.SQLException} (riga 5): eccezione tecnica propagata dal livello DB.
+\end{itemize}
+
+\paragraph{\texttt{Main.java}}
+Nessun import: classe bootstrap minimale che delega a \texttt{MainApp}.
+
+\paragraph{\texttt{MainApp.java}}
+\begin{itemize}
+  \item \texttt{javax.swing.SwingUtilities} (riga 3): avvio GUI su EDT.
+  \item \texttt{javax.swing.UIManager} (riga 4): look and feel nativo.
+  \item \texttt{it.unina.prog.ui.ConcessionarioFrame} (riga 6): finestra principale.
+\end{itemize}
+
+\subsubsection*{Package \texttt{it.unina.prog.model}}
+\paragraph{\texttt{Cliente.java}} Nessun import (POJO puro).
+\paragraph{\texttt{Dipendente.java}} Nessun import (POJO puro).
+\paragraph{\texttt{Veicolo.java}} Nessun import (POJO puro).
+
+\subsubsection*{Package \texttt{it.unina.prog.dao}}
+\paragraph{\texttt{ClienteDAO.java}}
+\begin{itemize}
+  \item \texttt{it.unina.prog.DBManager} (riga 3): connessione centralizzata.
+  \item \texttt{it.unina.prog.model.Cliente} (riga 4): mapping righe DB in oggetti.
+  \item \texttt{java.sql.Connection} (riga 6): sessione DB.
+  \item \texttt{java.sql.PreparedStatement} (riga 7): query parametrizzate sicure.
+  \item \texttt{java.sql.ResultSet} (riga 8): lettura risultati SELECT.
+  \item \texttt{java.sql.SQLException} (riga 9): gestione errori SQL.
+  \item \texttt{java.sql.Statement} (riga 10): query semplici senza parametri.
+  \item \texttt{java.util.ArrayList} (riga 11), \texttt{java.util.List} (riga 12): collezioni di clienti.
+\end{itemize}
+
+\paragraph{\texttt{DipendenteDAO.java}}
+\begin{itemize}
+  \item \texttt{it.unina.prog.DBManager} (riga 3), \texttt{it.unina.prog.model.Dipendente} (riga 4).
+  \item \texttt{Connection}, \texttt{PreparedStatement}, \texttt{ResultSet}, \texttt{SQLException} (righe 6--9): pipeline login/lookup dipendente.
+\end{itemize}
+
+\paragraph{\texttt{VeicoloDAO.java}}
+\begin{itemize}
+  \item \texttt{it.unina.prog.DBManager} (riga 3), \texttt{it.unina.prog.model.Veicolo} (riga 4).
+  \item \texttt{Connection}, \texttt{PreparedStatement}, \texttt{ResultSet}, \texttt{SQLException}, \texttt{Statement} (righe 6--10): CRUD + query catalogo/stato.
+  \item \texttt{ArrayList}, \texttt{List} (righe 11--12): raccolta veicoli per UI.
+\end{itemize}
+
+\paragraph{\texttt{TestDriveDAO.java}}
+\begin{itemize}
+  \item \texttt{it.unina.prog.DBManager} (riga 3).
+  \item \texttt{Connection}, \texttt{PreparedStatement}, \texttt{SQLException} (righe 5--7): inserimento prenotazione test drive.
+\end{itemize}
+
+\paragraph{\texttt{VenditaDAO.java}}
+\begin{itemize}
+  \item \texttt{it.unina.prog.DBManager} (riga 3).
+  \item \texttt{Connection}, \texttt{PreparedStatement}, \texttt{SQLException} (righe 5--7): registrazione vendita.
+\end{itemize}
+
+\subsubsection*{Package \texttt{it.unina.prog.ui.common}}
+\paragraph{\texttt{UiSupport.java}}
+\begin{itemize}
+  \item \texttt{javax.swing.*} (riga 3): popup e bordi titolati.
+  \item \texttt{java.awt.*} (riga 4): tipo \texttt{Component} e colori.
+\end{itemize}
+
+\subsubsection*{Package \texttt{it.unina.prog.ui.model}}
+\paragraph{\texttt{UiModels.java}}
+\begin{itemize}
+  \item \texttt{it.unina.prog.model.Cliente} (riga 3): wrapper UI per selezione cliente.
+\end{itemize}
+
+\subsubsection*{Package \texttt{it.unina.prog.ui.validation}}
+\paragraph{\texttt{InputValidator.java}}
+\begin{itemize}
+  \item \texttt{java.time.LocalDate} (riga 3): parsing/controllo date future.
+\end{itemize}
+
+\subsubsection*{Package \texttt{it.unina.prog.ui}}
+\paragraph{\texttt{ConcessionarioFrame.java}}
+\begin{itemize}
+  \item DAO import (righe 3--4): autenticazione per ruolo.
+  \item Model import (righe 5--6): dati sessione utente autenticato.
+  \item \texttt{UiSupport} (riga 7): coerenza UI e error handling.
+  \item Import pannelli customer/employee (righe 8--16): composizione dell'area a tab per i due ruoli.
+  \item \texttt{javax.swing.*} (riga 18): componenti grafici principali.
+  \item \texttt{java.awt.*} (riga 19): layout manager, dimensioni, colori.
+\end{itemize}
+
+\subsubsection*{Package \texttt{it.unina.prog.ui.panels.customer}}
+\paragraph{\texttt{CatalogoClientePanel.java}}
+\begin{itemize}
+  \item \texttt{VeicoloDAO}, \texttt{Veicolo}, \texttt{UiSupport} (righe 3--5): dati catalogo + supporto visuale.
+  \item \texttt{javax.swing.*} (riga 7), \texttt{DefaultTableModel} (riga 8), \texttt{java.awt.*} (riga 9): tabella e layout.
+\end{itemize}
+
+\paragraph{\texttt{OperazioniClientePanel.java}}
+\begin{itemize}
+  \item \texttt{DBManager} e \texttt{UiSupport} (righe 3--4): query storico + gestione errori.
+  \item \texttt{javax.swing.*}, \texttt{DefaultTableModel}, \texttt{java.awt.*} (righe 6--8): tab, tabella e toolbar.
+  \item \texttt{Connection}, \texttt{ResultSet} (righe 9--10): lettura storico vendite/test drive.
+\end{itemize}
+
+\paragraph{\texttt{ProfiloClientePanel.java}}
+\begin{itemize}
+  \item \texttt{DBManager}, \texttt{UiSupport}, \texttt{InputValidator} (righe 3--5): caricamento/salvataggio profilo validato.
+  \item \texttt{javax.swing.*}, \texttt{java.awt.*} (righe 7--8): form profilo.
+  \item \texttt{Connection}, \texttt{ResultSet} (righe 9--10): fetch dati utente.
+\end{itemize}
+
+\paragraph{\texttt{TestDriveClientePanel.java}}
+\begin{itemize}
+  \item \texttt{TestDriveDAO}, \texttt{VeicoloDAO}, \texttt{Veicolo} (righe 3--5): selezione mezzo e conferma prenotazione.
+  \item \texttt{UiSupport}, \texttt{UiModels.VeicoloItem}, \texttt{InputValidator} (righe 6--8): UX, etichette combo, regole data.
+  \item \texttt{javax.swing.*}, \texttt{java.awt.*}, \texttt{LocalDate} (righe 10--12): form e gestione data.
+\end{itemize}
+
+\subsubsection*{Package \texttt{it.unina.prog.ui.panels.employee}}
+\paragraph{\texttt{ClientiPanel.java}}
+\begin{itemize}
+  \item \texttt{ClienteDAO}, \texttt{Cliente}, \texttt{UiSupport}, \texttt{InputValidator} (righe 3--6): CRUD clienti validato.
+  \item \texttt{javax.swing.*}, \texttt{DefaultTableModel}, \texttt{java.awt.*}, \texttt{List} (righe 8--11): tabella, layout e lista dati.
+\end{itemize}
+
+\paragraph{\texttt{VeicoliPanel.java}}
+\begin{itemize}
+  \item \texttt{DBManager}, \texttt{VeicoloDAO}, \texttt{Veicolo}, \texttt{UiSupport}, \texttt{InputValidator} (righe 3--7): CRUD veicoli + controlli su marca/targa.
+  \item \texttt{javax.swing.*}, \texttt{DefaultTableModel}, \texttt{java.awt.*} (righe 9--11): UI tabellare/form complesso.
+  \item \texttt{Connection}, \texttt{ResultSet} (righe 12--13): query di supporto non incapsulate nel DAO.
+  \item \texttt{List} (riga 14): caricamento catalogo in memoria.
+\end{itemize}
+
+\paragraph{\texttt{VenditaPanel.java}}
+\begin{itemize}
+  \item \texttt{ClienteDAO}, \texttt{VeicoloDAO}, \texttt{VenditaDAO} (righe 3--5): alimentazione combo + commit vendita.
+  \item \texttt{Cliente}, \texttt{Veicolo} (righe 6--7): entita mostrate/selezionate.
+  \item \texttt{UiSupport}, \texttt{UiModels.ClienteItem}, \texttt{UiModels.VeicoloItem} (righe 8--10): UX errori + label leggibili in combo.
+  \item \texttt{javax.swing.*}, \texttt{java.awt.*} (righe 12--13): form di vendita.
+\end{itemize}
+
+\paragraph{\texttt{TestDrivePanel.java}}
+\begin{itemize}
+  \item \texttt{ClienteDAO}, \texttt{TestDriveDAO}, \texttt{VeicoloDAO} (righe 3--5): raccolta dati e scrittura prenotazione.
+  \item \texttt{Cliente}, \texttt{Veicolo} (righe 6--7): tipi dominio in selezione.
+  \item \texttt{UiSupport}, \texttt{UiModels.ClienteItem}, \texttt{UiModels.VeicoloItem}, \texttt{InputValidator} (righe 8--11): usabilita e validazione.
+  \item \texttt{javax.swing.*}, \texttt{java.awt.*}, \texttt{LocalDate} (righe 13--15): form e regole temporali.
+\end{itemize}
+
+\paragraph{\texttt{OrdiniPanel.java}}
+\begin{itemize}
+  \item \texttt{DBManager}, \texttt{UiSupport} (righe 3--4): query storico globale + error handling.
+  \item \texttt{javax.swing.*}, \texttt{DefaultTableModel}, \texttt{java.awt.*} (righe 6--8): doppia tabella e comandi operativi.
+  \item \texttt{Connection}, \texttt{ResultSet}, \texttt{Statement} (righe 9--11): SELECT aggregate e cancellazioni amministrative.
+\end{itemize}
+
+\subsection{Note finali sulla deduplicazione richiesta}
+I duplicati puramente meccanici non sono stati ripetuti riga per riga.
+Sono invece stati mantenuti i duplicati \textbf{semanticamente diversi} (stessa API, scopo differente),
+come richiesto: esempio \texttt{createStatement()} in DAO di elenco vs \texttt{createStatement()} in storico ordini con JOIN amministrative.
+
+\subsection{Risultato della revisione}
+Con questa estensione:
+\begin{itemize}
+  \item la documentazione supera significativamente la versione precedente in lunghezza e dettaglio;
+  \item ogni simbolo/API chiave richiesto e argomentato con riferimenti file/riga;
+  \item gli import sono coperti per tutti i file Java del progetto, inclusi quelli senza import.
+\end{itemize}
+
+\end{document}
