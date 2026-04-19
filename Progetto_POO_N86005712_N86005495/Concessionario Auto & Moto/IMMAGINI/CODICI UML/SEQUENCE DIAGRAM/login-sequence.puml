@@ -1,0 +1,62 @@
+@startuml login-sequence
+!theme plain
+
+actor User
+participant "ConcessionarioFrame" as Frame
+participant "InputValidator" as Validator
+participant "DipendenteDAO" as DepDAO
+participant "DatabaseManager" as DBMgr
+database "PostgreSQL" as DB
+
+User -> Frame: inserisci username e password
+Frame -> Validator: validateCredentials(username, password)
+activate Validator
+
+note over Validator
+  Valida formato email
+  Valida campi non vuoti
+end note
+
+Validator --> Frame: validation: boolean
+deactivate Validator
+
+alt Validazione OK
+  Frame -> DepDAO: getDipendente(username)
+  activate DepDAO
+  
+  DepDAO -> DBMgr: getConnection()
+  activate DBMgr
+  DBMgr --> DepDAO: Connection
+  deactivate DBMgr
+  
+  DepDAO -> DB: SELECT * FROM dipendente WHERE username = ?
+  activate DB
+  DB --> DepDAO: ResultSet
+  deactivate DB
+  
+  alt Dipendente trovato
+    note over DepDAO
+      Verifica password
+    end note
+    
+    alt Password corretta
+      DepDAO --> Frame: Dipendente object
+      deactivate DepDAO
+      Frame -> Frame: showAreaDipendente()
+      Frame --> User: Area Dipendente visualizzata
+    else Password errata
+      DepDAO --> Frame: DatabaseException
+      deactivate DepDAO
+      Frame --> User: Accesso negato
+    end
+  else Dipendente non trovato
+    DepDAO --> Frame: DatabaseException
+    deactivate DepDAO
+    Frame --> User: Utente non trovato
+  end
+else Validazione fallita
+  Validator --> Frame: ValidationException
+  Frame --> User: Errore: dati non validi
+end
+
+@enduml

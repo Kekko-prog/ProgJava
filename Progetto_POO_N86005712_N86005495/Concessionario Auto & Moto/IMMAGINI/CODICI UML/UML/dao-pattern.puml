@@ -1,0 +1,112 @@
+@startuml dao-pattern
+!theme plain
+
+package "Data Access Layer" {
+  interface DAO {
+    +CRUD_operations()
+  }
+  
+  interface VeicoloDAO {
+    +inserisciVeicolo(Veicolo): void
+    +eliminaVeicolo(int): void
+    +aggiornaVeicolo(Veicolo): void
+    +getAllVeicoli(): List<Veicolo>
+    +getVeicoloDisponibili(): List<Veicolo>
+  }
+  
+  interface ClienteDAO {
+    +inserisciCliente(Cliente): void
+    +eliminaCliente(int): void
+    +aggiornaCliente(Cliente): void
+    +getCliente(int): Cliente
+  }
+  
+  interface VenditaDAO {
+    +effettuaVendita(Vendita): void
+  }
+  
+  interface TestDriveDAO {
+    +richiediTestDrive(TestDrive): void
+  }
+  
+  interface DipendenteDAO {
+    +inserisciDipendente(Dipendente): void
+    +eliminaDipendente(int): void
+    +aggiornaDipendente(Dipendente): void
+    +getDipendente(int): Dipendente
+  }
+  
+  DAO <|-- VeicoloDAO
+  DAO <|-- ClienteDAO
+  DAO <|-- VenditaDAO
+  DAO <|-- TestDriveDAO
+  DAO <|-- DipendenteDAO
+}
+
+package "DAO Implementations" {
+  class VeicoloDAOImpl {
+    -dbManager: DatabaseManager
+    -connection: Connection
+    +inserisciVeicolo(Veicolo): void
+    +eliminaVeicolo(int): void
+    +aggiornaVeicolo(Veicolo): void
+    +getAllVeicoli(): List<Veicolo>
+    +getVeicoloDisponibili(): List<Veicolo>
+  }
+  
+  class ClienteDAOImpl {
+    -dbManager: DatabaseManager
+    -connection: Connection
+    +inserisciCliente(Cliente): void
+    +eliminaCliente(int): void
+    +aggiornaCliente(Cliente): void
+    +getCliente(int): Cliente
+  }
+  
+  class VenditaDAOImpl {
+    -dbManager: DatabaseManager
+    -connection: Connection
+    +effettuaVendita(Vendita): void
+  }
+  
+  class TestDriveDAOImpl {
+    -dbManager: DatabaseManager
+    -connection: Connection
+    +richiediTestDrive(TestDrive): void
+  }
+  
+  class DipendenteDAOImpl {
+    -dbManager: DatabaseManager
+    -connection: Connection
+    +inserisciDipendente(Dipendente): void
+    +eliminaDipendente(int): void
+    +aggiornaDipendente(Dipendente): void
+    +getDipendente(int): Dipendente
+  }
+  
+  VeicoloDAO <|.. VeicoloDAOImpl
+  ClienteDAO <|.. ClienteDAOImpl
+  VenditaDAO <|.. VenditaDAOImpl
+  TestDriveDAO <|.. TestDriveDAOImpl
+  DipendenteDAO <|.. DipendenteDAOImpl
+}
+
+package "Database Layer" {
+  class DatabaseManager {
+    -instance: DatabaseManager
+    -connection: Connection
+    +getInstance(): DatabaseManager
+    +getConnection(): Connection
+    +closeConnection(): void
+  }
+}
+
+VeicoloDAOImpl --> DatabaseManager : uses
+ClienteDAOImpl --> DatabaseManager : uses
+VenditaDAOImpl --> DatabaseManager : uses
+TestDriveDAOImpl --> DatabaseManager : uses
+DipendenteDAOImpl --> DatabaseManager : uses
+
+DatabaseManager --> "PostgreSQL\nDatabase" : JDBC
+
+@enduml

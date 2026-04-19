@@ -1,0 +1,145 @@
+@startuml class-diagram
+!theme plain
+
+skinparam backgroundColor #FEFEFE
+skinparam classBackgroundColor #FFFFFF
+skinparam classBorderColor #000000
+skinparam classArrowColor #000000
+
+package "Model" {
+  class Cliente {
+    -id: int
+    -nome: String
+    -cognome: String
+    -email: String
+    -telefono: String
+    -tipo: String
+    --
+    +getId(): int
+    +getNome(): String
+    +getCognome(): String
+    +getEmail(): String
+    +getTelefono(): String
+    +getTipo(): String
+  }
+  
+  class Veicolo {
+    -id: int
+    -marca: String
+    -modello: String
+    -anno: int
+    -tipo: String
+    -prezzo: double
+    -disponibile: boolean
+    --
+    +getId(): int
+    +getMarca(): String
+    +getModello(): String
+    +getAnno(): int
+    +getPrezzo(): double
+    +isDisponibile(): boolean
+  }
+  
+  class Dipendente {
+    -id: int
+    -nome: String
+    -cognome: String
+    -ruolo: String
+    -stipendio: double
+    --
+    +getId(): int
+    +getNome(): String
+    +getRuolo(): String
+  }
+}
+
+package "DAO" {
+  interface VeicoloDAO {
+    +getAllVeicoli(): List<Veicolo>
+    +getVeicoloDisponibili(): List<Veicolo>
+    +inserisciVeicolo(Veicolo): void
+  }
+  
+  interface ClienteDAO {
+    +getCliente(int): Cliente
+    +inserisciCliente(Cliente): void
+  }
+  
+  interface DipendenteDAO {
+    +getDipendente(int): Dipendente
+  }
+  
+  class DatabaseManager {
+    -instance: DatabaseManager
+    -connection: Connection
+    --
+    +getInstance(): DatabaseManager
+    +getConnection(): Connection
+  }
+}
+
+package "UI" {
+  class ConcessionarioFrame {
+    -cardPanel: JPanel
+    -cardLayout: CardLayout
+    -usernameField: JTextField
+    -passwordField: JPasswordField
+    --
+    +showLoginPanel(): void
+    +showAreaCliente(): void
+    +showAreaDipendente(): void
+  }
+  
+  class CatalogoClientePanel {
+    -veicoliTable: JTable
+    -veicoliDAO: VeicoloDAO
+    --
+    +loadVeicoli(): void
+    +aggiornaVeicoli(): void
+  }
+  
+  class ClientiPanel {
+    -clientiTable: JTable
+    -clientiDAO: ClienteDAO
+    --
+    +loadClienti(): void
+  }
+  
+  class InputValidator {
+    +validateEmail(String): boolean
+    +validatePhone(String): boolean
+    +validateInteger(String): boolean
+  }
+}
+
+package "Exception" {
+  class ConcessionarioException {
+    +ConcessionarioException(String)
+    +ConcessionarioException(String, Throwable)
+  }
+  
+  class DatabaseException {
+    +DatabaseException(String, Throwable)
+  }
+  
+  class ValidationException {
+    +ValidationException(String)
+  }
+}
+
+Veicolo -- VeicoloDAO : accessed by
+Cliente -- ClienteDAO : accessed by
+Dipendente -- DipendenteDAO : accessed by
+
+VeicoloDAO -- DatabaseManager : uses
+ClienteDAO -- DatabaseManager : uses
+DipendenteDAO -- DatabaseManager : uses
+
+ConcessionarioFrame --> CatalogoClientePanel : contains
+ConcessionarioFrame --> ClientiPanel : contains
+CatalogoClientePanel --> VeicoloDAO : uses
+ClientiPanel --> ClienteDAO : uses
+
+InputValidator ..> ValidationException : throws
+
+@enduml

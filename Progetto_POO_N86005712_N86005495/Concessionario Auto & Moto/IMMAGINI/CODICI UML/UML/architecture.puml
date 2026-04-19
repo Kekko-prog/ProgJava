@@ -1,0 +1,50 @@
+@startuml architecture
+!theme plain
+
+rectangle "Application Layer\nGUI Presentation" {
+  component [ConcessionarioFrame]
+  component [LoginPanel]
+  component [CustomerPanels]
+  component [EmployeePanels]
+  component [InputValidator]
+  component [UiSupport]
+}
+
+rectangle "Business Logic Layer\nModel & DAO" {
+  component [Model:\nCliente, Veicolo\nDipendente]
+  component [DAO Interfaces]
+  component [DAO Implementations]
+}
+
+rectangle "Database Layer\nPersistence" {
+  component [DatabaseManager]
+  component [PostgreSQL Database]
+}
+
+rectangle "Exception Handling\nError Management" {
+  component [ConcessionarioException]
+  component [DatabaseException]
+  component [ValidationException]
+}
+
+[LoginPanel] --> [InputValidator]
+[CustomerPanels] --> [InputValidator]
+[EmployeePanels] --> [InputValidator]
+
+[ConcessionarioFrame] --> [LoginPanel]
+[ConcessionarioFrame] --> [CustomerPanels]
+[ConcessionarioFrame] --> [EmployeePanels]
+
+[CustomerPanels] --> [DAO Interfaces]
+[EmployeePanels] --> [DAO Interfaces]
+
+[DAO Interfaces] - [DAO Implementations]
+[DAO Implementations] --> [Model:\nCliente, Veicolo\nDipendente]
+
+[DAO Implementations] --> [DatabaseManager]
+[DatabaseManager] --> [PostgreSQL Database]
+
+[DatabaseException] ..> [DAO Implementations]
+[ValidationException] ..> [InputValidator]
+
+@enduml

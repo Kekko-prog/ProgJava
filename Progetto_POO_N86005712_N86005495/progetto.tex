@@ -48,8 +48,52 @@ Java e un linguaggio di programmazione. Un programma Java e fatto da classi e me
 Il metodo speciale \texttt{main} e il punto di partenza: quando avvii il programma, Java entra li.
 
 \subsection{Che cos'e Swing}
-Swing e una libreria grafica di Java per creare finestre, pulsanti, caselle di testo e tabelle.
-Nel progetto, Swing serve per l'interfaccia del concessionario.
+Swing e una libreria grafica di Java (desktop) basata su componenti.
+In pratica, una GUI Swing e costruita combinando contenitori e controlli visuali:
+\texttt{JFrame}, \texttt{JPanel}, campi testo, pulsanti, tabelle, combo box, tab, popup.
+
+\textbf{Come ragiona Swing (idea fondamentale):}
+\begin{enumerate}
+  \item costruisci i componenti;
+  \item scegli un \emph{layout manager} per disporli;
+  \item li aggiungi ai contenitori;
+  \item colleghi gli eventi (click, selezioni, input) con i listener;
+  \item aggiorni la UI quando cambia lo stato (dati o schermate).
+\end{enumerate}
+
+\textbf{Componenti base che nel progetto usi continuamente:}
+\begin{itemize}
+  \item \texttt{JFrame}: finestra principale (il contenitore esterno dell'app).
+  \item \texttt{JPanel}: contenitore interno per costruire sezioni riusabili (form, toolbar, aree tabellari).
+  \item \texttt{JLabel}: testo descrittivo per campi e intestazioni.
+  \item \texttt{JTextField} / \texttt{JPasswordField}: input utente testuale.
+  \item \texttt{JButton}: comando esplicito (salva, aggiorna, elimina, accedi, conferma).
+  \item \texttt{JComboBox}: scelta da lista (ruolo, cliente, veicolo).
+  \item \texttt{JTable} + \texttt{DefaultTableModel}: visualizzazione dati tabellari con righe/colonne.
+  \item \texttt{JTabbedPane}: separazione funzioni in schede.
+  \item \texttt{JScrollPane}: scorrimento di tabelle e aree con contenuti lunghi.
+  \item \texttt{JOptionPane}: dialog di errore, conferma e informazione.
+\end{itemize}
+
+\textbf{Layout manager principali e perche sono cruciali:}
+\begin{itemize}
+  \item \texttt{BorderLayout}: divide in \texttt{NORTH/CENTER/SOUTH/...}; ideale per header + contenuto centrale.
+  \item \texttt{GridBagLayout}: form complessi con controllo fine di righe, colonne, margini e allineamenti.
+  \item \texttt{FlowLayout}: barre azioni lineari di bottoni (sinistra/destra).
+  \item \texttt{CardLayout}: cambio schermata nella stessa area (es. login/cliente/dipendente) senza aprire nuove finestre.
+\end{itemize}
+
+\textbf{Eventi e azioni (la parte piu importante per bottoni e pannelli):}
+\begin{itemize}
+  \item ogni bottone o controllo genera eventi;
+  \item \texttt{addActionListener(...)} collega l'evento click alla logica applicativa;
+  \item il codice del listener decide cosa fare: validazione input, chiamata DAO, refresh tabella, cambio tab, popup errore;
+  \item in caso di errore, si comunica all'utente con messaggi chiari e uniformi.
+\end{itemize}
+
+\textbf{Nel progetto specifico:}
+Swing serve a costruire un'interfaccia multi-ruolo con navigazione ordinata, comandi espliciti e feedback immediato,
+mantenendo separata la grafica dalla logica di accesso ai dati.
 
 \subsection{Che cos'e JDBC}
 JDBC e il modo standard con cui Java parla con il database SQL.
@@ -491,13 +535,42 @@ si tratta di viste aggregate con join e ordinamenti specifici, comode per report
 \subsection{Swing/AWT}
 \textbf{Perche usate:} costruiscono interfaccia desktop nativa Java.
 
-\textbf{Spiegazione semplice:}
+\textbf{Spiegazione completa (componenti, pannelli, azioni, bottoni):}
 \begin{itemize}
-  \item \texttt{JPanel}: contenitore di componenti.
-  \item \texttt{Layout} (Border/GridBag/Card/Flow): decide come disporre gli elementi.
-  \item \texttt{JButton/JTextField/JTable}: input e visualizzazione dati.
-  \item \texttt{JOptionPane}: popup messaggi/confirm.
-  \item \texttt{addActionListener}: reagisce al click utente.
+  \item \texttt{JPanel}: un pannello e un contenitore logico. Nel progetto ogni area funzionale (clienti, veicoli, vendite, test drive) e un pannello dedicato.
+  \item \texttt{JFrame}: contenitore principale che ospita header, area centrale e card di navigazione.
+  \item \texttt{Layout manager}: decidono la geometria dell'interfaccia; senza layout la UI sarebbe rigida e difficile da mantenere.
+  \item \texttt{GridBagConstraints}: in \texttt{GridBagLayout} controlla posizione, riempimento, spaziature e larghezza colonne del form.
+  \item \texttt{FlowLayout}: usato nelle \emph{actions bar} per allineare bottoni come \texttt{Salva/Modifica/Elimina/Aggiorna}.
+  \item \texttt{JButton}: rappresenta un comando atomico; ogni bottone e legato a una singola intenzione utente.
+  \item \texttt{addActionListener}: registra il comportamento del bottone o della combo; e il ponte tra interazione utente e logica Java.
+  \item \texttt{JTextField/JPasswordField}: raccolgono credenziali e dati inseriti manualmente.
+  \item \texttt{JComboBox}: evita input libero quando i valori possibili sono finiti (es. cliente o veicolo selezionabile).
+  \item \texttt{JTable + DefaultTableModel}: separano vista e dati tabellari, facilitando refresh e aggiornamenti dinamici.
+  \item \texttt{JTabbedPane}: riduce il numero di finestre e organizza funzioni correlate in schede.
+  \item \texttt{JOptionPane}: feedback immediato per errori, conferme o operazioni completate.
+\end{itemize}
+
+\textbf{Funzioni/operazioni Swing piu usate nel progetto (concetti chiave):}
+\begin{itemize}
+  \item \texttt{setLayout(...)}: imposta la strategia di disposizione componenti.
+  \item \texttt{add(...)}: inserisce componente nel contenitore con eventuali vincoli/layout.
+  \item \texttt{setPreferredSize(...)} e \texttt{setMinimumSize(...)}: guidano la dimensione suggerita e minima delle aree.
+  \item \texttt{setBorder(...)}: migliora leggibilita con sezioni titolate.
+  \item \texttt{setOpaque(false)}: usato su pannelli azioni per integrare lo sfondo senza blocchi visivi.
+  \item \texttt{setText(...)} / \texttt{getText()}: lettura e scrittura contenuto controlli.
+  \item \texttt{setVisible(...)}: mostra/nasconde elementi in base allo stato (es. logout).
+  \item \texttt{revalidate()} e \texttt{repaint()}: aggiornano layout e rendering dopo cambi dinamici.
+  \item \texttt{show(...)} con \texttt{CardLayout}: cambio schermata interno alla finestra.
+  \item \texttt{addTab(...)} con \texttt{JTabbedPane}: costruzione dinamica delle aree per ruolo.
+\end{itemize}
+
+\textbf{Best practice Swing rispettate nel progetto:}
+\begin{itemize}
+  \item avvio GUI su EDT (thread corretto) per stabilita.
+  \item separazione visuale in pannelli piccoli e specializzati.
+  \item listener brevi che delegano a metodi dedicati (es. login e validazioni).
+  \item gestione errori centralizzata e uniforme tramite utility condivisa.
 \end{itemize}
 
 \subsection{JDBC}
@@ -1379,6 +1452,54 @@ Nel progetto viene usato in modalita tipica enterprise didattica:
   \item layout manager per comporre schermate flessibili;
   \item listener evento per reagire alle azioni utente;
   \item modelli tabellari per separare dati e presentazione.
+\end{itemize}
+
+\textbf{Architettura interna di una GUI Swing applicata al vostro codice:}
+\begin{enumerate}
+  \item \textbf{Root container}: una \texttt{JFrame} principale contiene tutta l'app.
+  \item \textbf{Container gerarchici}: \texttt{JPanel} annidati rappresentano sezioni (header, form, toolbar, tabelle).
+  \item \textbf{Navigation layer}: \texttt{CardLayout} per macro-schermate e \texttt{JTabbedPane} per sotto-funzionalita.
+  \item \textbf{Input controls}: campi testo, password e combo raccolgono dati strutturati.
+  \item \textbf{Action controls}: bottoni collegati a listener eseguono i casi d'uso.
+  \item \textbf{Data views}: tabelle e model rendono leggibili i risultati provenienti da DAO e query.
+\end{enumerate}
+
+\textbf{Pannelli, azioni, bottoni: funzione precisa di ciascun blocco}
+\begin{itemize}
+  \item \texttt{Pannello form}: contiene etichette + campi input + validazioni preliminari.
+  \item \texttt{Pannello actions}: contiene solo comandi, spesso con \texttt{FlowLayout}, per rendere evidente il flusso operativo.
+  \item \texttt{Pannello tabellare}: mostra stato corrente dei dati e consente selezione righe.
+  \item \texttt{Pannello wrapper}: incapsula una funzione completa e la rende riusabile dentro tab o card.
+\end{itemize}
+
+\textbf{Ciclo completo di una action Swing (esempio generale):}
+\begin{enumerate}
+  \item utente preme un \texttt{JButton};
+  \item il relativo \texttt{ActionListener} legge valori dei campi;
+  \item viene eseguita validazione (stringhe vuote, formati, conversioni numeriche/date);
+  \item viene chiamata logica dati (DAO/JDBC);
+  \item se tutto va bene, la UI aggiorna tabella/combo/stato sessione;
+  \item se c'e errore, si mostra messaggio utente comprensibile.
+\end{enumerate}
+
+\textbf{Funzioni Swing/AWT che devi conoscere bene per capire tutto il progetto:}
+\begin{itemize}
+  \item \texttt{new JPanel(layout)}: crea contenitore con layout specifico.
+  \item \texttt{new JButton("...")} : crea comando utente.
+  \item \texttt{button.addActionListener(e -> \{...\})}: associa comportamento al comando.
+  \item \texttt{container.add(component, constraints)}: inserisce componente nella gerarchia UI.
+  \item \texttt{tabs.addTab("Titolo", panel)}: aggiunge sezione navigabile.
+  \item \texttt{cardLayout.show(cardPanel, nomeCard)}: passa da una schermata all'altra.
+  \item \texttt{tableModel.setRowCount(0)} e \texttt{addRow(...)}: refresh dati tabella.
+  \item \texttt{component.setEnabled(...)}, \texttt{setVisible(...)}: controlla interattivita e visibilita.
+  \item \texttt{revalidate()} e \texttt{repaint()}: sincronizza layout e rendering dopo modifiche dinamiche.
+\end{itemize}
+
+\textbf{Perche questa impostazione e corretta anche a livello progettuale:}
+\begin{itemize}
+  \item riduce accoppiamento tra grafica e database;
+  \item rende i pannelli comprensibili e manutenibili a blocchi;
+  \item facilita estensioni future (nuovi tab, nuovi bottoni, nuove action) senza riscrivere la finestra principale.
 \end{itemize}
 
 \textbf{Perche Swing e adatto qui:}

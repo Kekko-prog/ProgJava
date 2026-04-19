@@ -1,0 +1,110 @@
+@startuml package-diagram
+!theme plain
+
+skinparam backgroundColor #FEFEFE
+skinparam packageBackgroundColor #F0F0F0
+skinparam packageBorderColor #000000
+skinparam classBackgroundColor #FFFFFF
+skinparam classBorderColor #000000
+
+package "it.unina.prog" {
+  
+  package "model" {
+    class Cliente {
+      -id: int
+      -nome: String
+      -cognome: String
+      -email: String
+      -telefono: String
+      -tipo: String
+    }
+    
+    class Veicolo {
+      -id: int
+      -marca: String
+      -modello: String
+      -anno: int
+      -prezzo: double
+      -disponibile: boolean
+    }
+    
+    class Dipendente {
+      -id: int
+      -nome: String
+      -cognome: String
+      -ruolo: String
+      -stipendio: double
+    }
+  }
+  
+  package "dao" {
+    interface VeicoloDAO
+    interface ClienteDAO
+    interface VenditaDAO
+    interface TestDriveDAO
+    interface DipendenteDAO
+  }
+  
+  package "dao.impl" {
+    class VeicoloDAOImpl
+    class ClienteDAOImpl
+    class VenditaDAOImpl
+    class TestDriveDAOImpl
+    class DipendenteDAOImpl
+  }
+  
+  package "db" {
+    class DatabaseManager
+  }
+  
+  package "ui" {
+    class ConcessionarioFrame
+  }
+  
+  package "ui.panels.customer" {
+    class CatalogoClientePanel
+    class ProfiloClientePanel
+    class TestDriveClientePanel
+    class OperazioniClientePanel
+  }
+  
+  package "ui.panels.employee" {
+    class ClientiPanel
+    class VeicoliPanel
+    class VenditaPanel
+    class TestDrivePanel
+    class OrdiniPanel
+  }
+  
+  package "ui.common" {
+    class UiSupport
+  }
+  
+  package "ui.validation" {
+    class InputValidator
+  }
+  
+  package "ui.model" {
+    class UiModels
+  }
+  
+  package "exception" {
+    class ConcessionarioException
+    class DatabaseException
+    class ValidationException
+  }
+  
+  VeicoloDAOImpl ..|> VeicoloDAO
+  ClienteDAOImpl ..|> ClienteDAO
+  VenditaDAOImpl ..|> VenditaDAO
+  TestDriveDAOImpl ..|> TestDriveDAO
+  DipendenteDAOImpl ..|> DipendenteDAO
+  
+  ConcessionarioFrame --> CatalogoClientePanel
+  ConcessionarioFrame --> ClientiPanel
+  
+  VeicoloDAOImpl --> DatabaseManager : uses
+  ClienteDAOImpl --> DatabaseManager : uses
+}
+
+@enduml

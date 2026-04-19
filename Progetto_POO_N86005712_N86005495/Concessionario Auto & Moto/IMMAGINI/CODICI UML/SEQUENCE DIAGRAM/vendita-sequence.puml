@@ -1,0 +1,82 @@
+@startuml vendita-sequence
+!theme plain
+
+actor User
+participant "VenditaPanel" as Panel
+participant "InputValidator" as Validator
+participant "VenditaDAO" as VendDAO
+participant "DatabaseManager" as DBMgr
+database "PostgreSQL" as DB
+
+User -> Panel: seleziona cliente, veicolo, prezzo
+Panel -> Validator: validateInput(cliente, veicolo, prezzo)
+activate Validator
+
+note over Validator
+  Valida cliente not null
+  Valida veicolo not null
+  Valida prezzo > 0
+end note
+
+Validator --> Panel: validation: boolean
+deactivate Validator
+
+alt Validazione OK
+  Panel -> Panel: createVendita(cliente, veicolo, prezzo)
+  
+  Panel -> VendDAO: effettuaVendita(vendita)
+  activate VendDAO
+  
+  VendDAO -> DBMgr: getConnection()
+  activate DBMgr
+  DBMgr --> VendDAO: Connection
+  deactivate DBMgr
+  
+  VendDAO -> DB: BEGIN TRANSACTION
+  
+  note over VendDAO, DB
+    Inserisci nuovo record vendita
+  end note
+  
+  VendDAO -> DB: INSERT INTO vendita (cliente_id, veicolo_id, data, prezzo)
+  activate DB
+  DB --> VendDAO: rows inserted
+  deactivate DB
+  
+  alt Inserimento OK
+    note over VendDAO, DB
+      Aggiorna disponibilita veicolo
+    end note
+    
+    VendDAO -> DB: UPDATE veicolo SET disponibile = false WHERE id = ?
+    activate DB
+    DB --> VendDAO: rows updated
+    deactivate DB
+    
+    VendDAO -> DB: COMMIT
+    activate DB
+    DB --> VendDAO: transaction committed
+    deactivate DB
+    
+    VendDAO --> Panel: success
+    deactivate VendDAO
+    Panel -> Panel: refreshVeicoliList()
+    Panel --> User: Vendita registrata con successo
+    
+  else Inserimento fallito
+    VendDAO -> DB: ROLLBACK
+    activate DB
+    DB --> VendDAO: transaction rolled back
+    deactivate DB
+    
+    VendDAO --> Panel: DatabaseException
+    deactivate VendDAO
+    Panel --> User: Errore: vendita non registrata
+  end
+  
+else Validazione fallita
+  Validator --> Panel: ValidationException
+  Panel --> User: Errore: verifica i dati inseriti
+end
+
+@enduml
