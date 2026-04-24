@@ -1,20 +1,19 @@
-package it.unina.prog.ui.panels.employee;
+package it.unina.prog.gui.panels.employee;
 
-import it.unina.prog.DBManager;
-import it.unina.prog.ui.common.UiSupport;
+import it.unina.prog.controller.ConcessionarioController;
+import it.unina.prog.gui.common.UiSupport;
 
 import javax.swing.*;
-import javax.swing.table.DefaultTableModel;
+import javax.swing.table.*;
 import java.awt.*;
-import java.sql.Connection;
-import java.sql.ResultSet;
-import java.sql.Statement;
 
 public class OrdiniPanel extends JPanel {
     private final DefaultTableModel venditeModel;
     private final DefaultTableModel testDriveModel;
+    private final ConcessionarioController controller;
 
-    public OrdiniPanel() {
+    public OrdiniPanel(ConcessionarioController ctrl) {
+        this.controller = ctrl;
         setLayout(new BorderLayout(10, 10));
         setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
 
@@ -52,28 +51,12 @@ public class OrdiniPanel extends JPanel {
         Runnable load = () -> {
             venditeModel.setRowCount(0);
             testDriveModel.setRowCount(0);
-            try (Connection conn = DBManager.getConnection(); Statement st = conn.createStatement()) {
-                try (ResultSet rs = st.executeQuery("SELECT v.id, v.data, v.veicolo, c.nome as cliente, d.nome as dipendente, v.prezzo_finale FROM Vendita v JOIN Cliente c ON v.cliente = c.id JOIN Dipendente d ON v.dipendente = d.id ORDER BY v.data DESC")) {
-                    while (rs.next()) {
-                        venditeModel.addRow(new Object[]{
-                                rs.getInt("id"),
-                                rs.getString("data"),
-                                rs.getString("veicolo"),
-                                rs.getString("cliente"),
-                                rs.getString("dipendente"),
-                                rs.getDouble("prezzo_finale")
-                        });
-                    }
+            try {
+                for (Object[] row : this.controller.getOrdiniVendite()) {
+                    venditeModel.addRow(row);
                 }
-                try (ResultSet rs = st.executeQuery("SELECT t.id, t.data, c.nome as cliente, t.veicolo FROM TestDrive t JOIN Cliente c ON t.cliente = c.id ORDER BY t.data DESC")) {
-                    while (rs.next()) {
-                        testDriveModel.addRow(new Object[]{
-                                rs.getInt("id"),
-                                rs.getString("data"),
-                                rs.getString("cliente"),
-                                rs.getString("veicolo")
-                        });
-                    }
+                for (Object[] row : this.controller.getOrdiniTestDrive()) {
+                    testDriveModel.addRow(row);
                 }
             } catch (Exception ex) {
                 UiSupport.showErr(this, ex);
@@ -101,11 +84,8 @@ public class OrdiniPanel extends JPanel {
                 return;
             }
 
-            String sql = "DELETE FROM Vendita WHERE id = ?";
-            try (Connection conn = DBManager.getConnection();
-                 java.sql.PreparedStatement ps = conn.prepareStatement(sql)) {
-                ps.setInt(1, idVendita);
-                ps.executeUpdate();
+            try {
+                this.controller.eliminaVendita(idVendita);
                 load.run();
                 JOptionPane.showMessageDialog(this, "Vendita eliminata con successo");
             } catch (Exception ex) {
@@ -131,11 +111,8 @@ public class OrdiniPanel extends JPanel {
                 return;
             }
 
-            String sql = "DELETE FROM TestDrive WHERE id = ?";
-            try (Connection conn = DBManager.getConnection();
-                 java.sql.PreparedStatement ps = conn.prepareStatement(sql)) {
-                ps.setInt(1, idTestDrive);
-                ps.executeUpdate();
+            try {
+                this.controller.eliminaTestDrive(idTestDrive);
                 load.run();
                 JOptionPane.showMessageDialog(this, "Test drive eliminato con successo");
             } catch (Exception ex) {

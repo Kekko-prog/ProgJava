@@ -1,109 +1,70 @@
 package it.unina.prog.dao;
 
-import it.unina.prog.DBManager;
+import it.unina.prog.exception.DatabaseException;
 import it.unina.prog.model.Veicolo;
 
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Statement;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 
-public class VeicoloDAO {
-    public static void inserisciVeicolo(String targa, String marca, String modello, String tipo, double prezzo) throws SQLException {
-        String sql = "INSERT INTO Veicolo (targa, marca, modello, tipo, prezzo) VALUES (?, ?, ?, ?, ?)";
-        try (Connection conn = DBManager.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, targa);
-            ps.setString(2, marca);
-            ps.setString(3, modello);
-            ps.setString(4, tipo);
-            ps.setDouble(5, prezzo);
-            ps.executeUpdate();
-        }
-    }
+/**
+ * DAO Interface per la gestione dei Veicoli.
+ * Responsabile di tutte le operazioni di inventario sui veicoli.
+ * L'implementazione concreta è in VeicoloDAOImpl.
+ * 
+ * Responsabilità:
+ * - CRUD completo sui veicoli
+ * - Queries per filtrare veicoli disponibili vs. venduti
+ * - Gestione dello stato dei veicoli
+ */
+public interface VeicoloDAO {
+    /**
+     * Inserisce un nuovo veicolo nel catalogo.
+     * @param targa targa unica del veicolo
+     * @param marca marca/costruttore
+     * @param modello modello specifico
+     * @param tipo categoria (es. "Auto", "Moto")
+     * @param prezzo prezzo di catalogo
+     * @throws DatabaseException se l'inserimento fallisce
+     */
+    void inserisciVeicolo(String targa, String marca, String modello, String tipo, double prezzo) throws DatabaseException;
 
-    public static String getStatoVeicolo(String targa) throws SQLException {
-        String sql = "SELECT get_stato_veicolo(?) AS stato";
-        try (Connection conn = DBManager.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, targa);
-            try (ResultSet rs = ps.executeQuery()) {
-                if (rs.next()) {
-                    return rs.getString("stato");
-                }
-            }
-        }
-        return "sconosciuto";
-    }
+    /**
+     * Recupera lo stato attuale di un veicolo (disponibile, venduto, manutenzione, etc.).
+     * @param targa targa del veicolo
+     * @return stato del veicolo oppure null se non trovato
+     * @throws DatabaseException se la query fallisce
+     */
+    String getStatoVeicolo(String targa) throws DatabaseException;
 
-    public static List<Veicolo> getVeicoliDisponibili() throws SQLException {
-        List<Veicolo> veicoli = new ArrayList<>();
-        String sql = "SELECT * FROM Veicolo";
-        try (Connection conn = DBManager.getConnection();
-             Statement st = conn.createStatement();
-             ResultSet rs = st.executeQuery(sql)) {
-            while (rs.next()) {
-                String targa = rs.getString("targa");
-                String stato = getStatoVeicolo(targa);
-                if ("disponibile".equals(stato)) {
-                    veicoli.add(new Veicolo(
-                        targa,
-                        rs.getString("marca"),
-                        rs.getString("modello"),
-                        rs.getString("tipo"),
-                        rs.getDouble("prezzo"),
-                        stato
-                    ));
-                }
-            }
-        }
-        return veicoli;
-    }
+    /**
+     * Recupera solo i veicoli ancora disponibili per la vendita.
+     * @return lista di Veicoli con stato "Disponibile"
+     * @throws DatabaseException se la query fallisce
+     */
+    List<Veicolo> getVeicoliDisponibili() throws DatabaseException;
 
-    public static void aggiornaVeicolo(String targa, String marca, String modello, String tipo, double prezzo) throws SQLException {
-        String sql = "UPDATE Veicolo SET marca=?, modello=?, tipo=?, prezzo=? WHERE targa=?";
-        try (Connection conn = DBManager.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, marca);
-            ps.setString(2, modello);
-            ps.setString(3, tipo);
-            ps.setDouble(4, prezzo);
-            ps.setString(5, targa);
-            ps.executeUpdate();
-        }
-    }
+    /**
+     * Aggiorna i dettagli di un veicolo esistente.
+     * @param targa targa del veicolo da aggiornare (PK)
+     * @param marca nuova marca
+     * @param modello nuovo modello
+     * @param tipo nuovo tipo
+     * @param prezzo nuovo prezzo
+     * @throws DatabaseException se l'aggiornamento fallisce
+     */
+    void aggiornaVeicolo(String targa, String marca, String modello, String tipo, double prezzo) throws DatabaseException;
 
-    public static void eliminaVeicolo(String targa) throws SQLException {
-        String sql = "DELETE FROM Veicolo WHERE targa=?";
-        try (Connection conn = DBManager.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, targa);
-            ps.executeUpdate();
-        }
-    }
+    /**
+     * Elimina un veicolo dal catalogo.
+     * Solitamente operazione rara, usata solo se il veicolo non è mai stato venduto.
+     * @param targa targa del veicolo da eliminare
+     * @throws DatabaseException se l'eliminazione fallisce
+     */
+    void eliminaVeicolo(String targa) throws DatabaseException;
 
-    public static List<Veicolo> getAllVeicoli() throws SQLException {
-        List<Veicolo> veicoli = new ArrayList<>();
-        String sql = "SELECT * FROM Veicolo";
-        try (Connection conn = DBManager.getConnection();
-             Statement st = conn.createStatement();
-             ResultSet rs = st.executeQuery(sql)) {
-            while (rs.next()) {
-                String targa = rs.getString("targa");
-                String stato = getStatoVeicolo(targa);
-                veicoli.add(new Veicolo(
-                    targa,
-                    rs.getString("marca"),
-                    rs.getString("modello"),
-                    rs.getString("tipo"),
-                    rs.getDouble("prezzo"),
-                    stato
-                ));
-            }
-        }
-        return veicoli;
-    }
+    /**
+     * Recupera TUTTI i veicoli nel catalogo, inclusi quelli già venduti.
+     * @return lista di tutti i Veicoli
+     * @throws DatabaseException se la query fallisce
+     */
+    List<Veicolo> getAllVeicoli() throws DatabaseException;
 }

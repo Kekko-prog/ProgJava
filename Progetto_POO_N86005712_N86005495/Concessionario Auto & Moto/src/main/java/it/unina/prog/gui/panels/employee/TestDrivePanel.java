@@ -1,14 +1,12 @@
-package it.unina.prog.ui.panels.employee;
+package it.unina.prog.gui.panels.employee;
 
-import it.unina.prog.dao.ClienteDAO;
-import it.unina.prog.dao.TestDriveDAO;
-import it.unina.prog.dao.VeicoloDAO;
+import it.unina.prog.controller.ConcessionarioController;
 import it.unina.prog.model.Cliente;
 import it.unina.prog.model.Veicolo;
-import it.unina.prog.ui.common.UiSupport;
-import it.unina.prog.ui.model.UiModels.ClienteItem;
-import it.unina.prog.ui.model.UiModels.VeicoloItem;
-import it.unina.prog.ui.validation.InputValidator;
+import it.unina.prog.gui.common.UiSupport;
+import it.unina.prog.gui.model.UiModels.ClienteItem;
+import it.unina.prog.gui.model.UiModels.VeicoloItem;
+import it.unina.prog.gui.validation.InputValidator;
 
 import javax.swing.*;
 import java.awt.*;
@@ -18,8 +16,10 @@ public class TestDrivePanel extends JPanel {
     private final JComboBox<VeicoloItem> veicolo = new JComboBox<>();
     private final JComboBox<ClienteItem> cliente = new JComboBox<>();
     private final JTextField data = new JTextField(LocalDate.now().toString(), 12);
+    private final ConcessionarioController controller;
 
-    public TestDrivePanel() {
+    public TestDrivePanel(ConcessionarioController ctrl) {
+        this.controller = ctrl;
         setLayout(new BorderLayout(10, 10));
         setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
 
@@ -50,10 +50,10 @@ public class TestDrivePanel extends JPanel {
             try {
                 veicolo.removeAllItems();
                 cliente.removeAllItems();
-                for (Veicolo v : VeicoloDAO.getVeicoliDisponibili()) {
+                for (Veicolo v : this.controller.getVeicoliDisponibili()) {
                     veicolo.addItem(new VeicoloItem(v.getTarga(), v.getModello(), v.getPrezzo()));
                 }
-                for (Cliente c : ClienteDAO.getClienti()) {
+                for (Cliente c : this.controller.getClienti()) {
                     cliente.addItem(new ClienteItem(c.getId(), c.getNome()));
                 }
             } catch (Exception ex) {
@@ -74,7 +74,7 @@ public class TestDrivePanel extends JPanel {
                 LocalDate dataTestDrive = InputValidator.parseDateOrThrow(dataInput);
                 InputValidator.requireTodayOrFuture(dataTestDrive);
 
-                TestDriveDAO.richiediTestDrive(c.id, v.targa, dataInput);
+                this.controller.richiediTestDrive(c.id, v.targa, dataInput);
                 JOptionPane.showMessageDialog(this, "Test drive registrato con successo");
                 load.run();
             } catch (Exception ex) {

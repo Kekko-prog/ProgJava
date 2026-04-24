@@ -1,16 +1,13 @@
-package it.unina.prog.ui.panels.employee;
+package it.unina.prog.gui.panels.employee;
 
-import it.unina.prog.DBManager;
-import it.unina.prog.dao.VeicoloDAO;
+import it.unina.prog.controller.ConcessionarioController;
 import it.unina.prog.model.Veicolo;
-import it.unina.prog.ui.common.UiSupport;
-import it.unina.prog.ui.validation.InputValidator;
+import it.unina.prog.gui.common.UiSupport;
+import it.unina.prog.gui.validation.InputValidator;
 
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
-import java.sql.Connection;
-import java.sql.ResultSet;
 import java.util.List;
 
 public class VeicoliPanel extends JPanel {
@@ -22,8 +19,10 @@ public class VeicoliPanel extends JPanel {
     private final JTextField modello = new JTextField(14);
     private final JComboBox<String> tipo = new JComboBox<>(new String[]{"auto", "moto"});
     private final JTextField prezzo = new JTextField(10);
+    private final ConcessionarioController controller;
 
-    public VeicoliPanel() {
+    public VeicoliPanel(ConcessionarioController controller) {
+        this.controller = controller;
         setLayout(new BorderLayout(10, 10));
         setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
 
@@ -76,7 +75,7 @@ public class VeicoliPanel extends JPanel {
         Runnable load = () -> {
             try {
                 model.setRowCount(0);
-                List<Veicolo> veicoli = VeicoloDAO.getAllVeicoli();
+                List<Veicolo> veicoli = controller.getAllVeicoli();
                 for (Veicolo v : veicoli) {
                     model.addRow(new Object[]{v.getTarga(), v.getMarca(), v.getModello(), v.getTipo(), v.getPrezzo(), v.getStato()});
                 }
@@ -107,7 +106,7 @@ public class VeicoliPanel extends JPanel {
                     throw new IllegalArgumentException("Targa gia presente: usa una targa diversa");
                 }
                 ensureMarcaExistsOrCreate();
-                VeicoloDAO.inserisciVeicolo(targaCanonica, marca.getText().trim(), modello.getText().trim(), String.valueOf(tipo.getSelectedItem()), prezzoVal);
+                controller.inserisciVeicolo(targaCanonica, marca.getText().trim(), modello.getText().trim(), String.valueOf(tipo.getSelectedItem()), prezzoVal);
                 load.run();
                 clear();
             } catch (Exception ex) {
@@ -125,7 +124,7 @@ public class VeicoliPanel extends JPanel {
                 double prezzoVal = validateVeicoloInput();
                 String targaCanonica = InputValidator.normalizePlate(targa.getText());
                 ensureMarcaExistsOrCreate();
-                VeicoloDAO.aggiornaVeicolo(targaCanonica, marca.getText().trim(), modello.getText().trim(), String.valueOf(tipo.getSelectedItem()), prezzoVal);
+                controller.aggiornaVeicolo(targaCanonica, marca.getText().trim(), modello.getText().trim(), String.valueOf(tipo.getSelectedItem()), prezzoVal);
                 load.run();
                 clear();
             } catch (Exception ex) {
@@ -143,7 +142,7 @@ public class VeicoliPanel extends JPanel {
                 return;
             }
             try {
-                VeicoloDAO.eliminaVeicolo(targa.getText().trim());
+                controller.eliminaVeicolo(targa.getText().trim());
                 load.run();
                 clear();
             } catch (Exception ex) {
@@ -193,13 +192,8 @@ public class VeicoliPanel extends JPanel {
     }
 
     private boolean targaExistsIgnoringCaseAndSpaces(String targaInput) {
-        String sql = "SELECT 1 FROM Veicolo WHERE UPPER(REPLACE(targa, ' ', '')) = UPPER(REPLACE(?, ' ', ''))";
-        try (Connection conn = DBManager.getConnection();
-             java.sql.PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, targaInput);
-            try (ResultSet rs = ps.executeQuery()) {
-                return rs.next();
-            }
+        try {
+            return controller.targaExistsIgnoringCaseAndSpaces(targaInput);
         } catch (Exception ex) {
             throw new IllegalArgumentException("Impossibile verificare la targa inserita: " + UiSupport.toUserMessage(ex));
         }
@@ -229,25 +223,16 @@ public class VeicoliPanel extends JPanel {
             throw new IllegalArgumentException("La nazione della nuova marca e obbligatoria");
         }
 
-        String sql = "INSERT INTO Marca (nome, nazione) VALUES (?, ?)";
-        try (Connection conn = DBManager.getConnection();
-             java.sql.PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, nomeMarca);
-            ps.setString(2, nazione);
-            ps.executeUpdate();
+        try {
+            controller.creaMarca(nomeMarca, nazione);
         } catch (Exception ex) {
             throw new IllegalArgumentException("Impossibile creare la nuova marca: " + UiSupport.toUserMessage(ex));
         }
     }
 
     private boolean marcaExists(String nomeMarca) {
-        String sql = "SELECT 1 FROM Marca WHERE LOWER(nome) = LOWER(?)";
-        try (Connection conn = DBManager.getConnection();
-             java.sql.PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, nomeMarca);
-            try (ResultSet rs = ps.executeQuery()) {
-                return rs.next();
-            }
+        try {
+            return controller.marcaExists(nomeMarca);
         } catch (Exception ex) {
             throw new IllegalArgumentException("Impossibile verificare la marca inserita: " + UiSupport.toUserMessage(ex));
         }

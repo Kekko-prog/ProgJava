@@ -1,17 +1,19 @@
-package it.unina.prog.ui.panels.customer;
+package it.unina.prog.gui.panels.customer;
 
-import it.unina.prog.dao.VeicoloDAO;
+import it.unina.prog.controller.ConcessionarioController;
 import it.unina.prog.model.Veicolo;
-import it.unina.prog.ui.common.UiSupport;
+import it.unina.prog.gui.common.UiSupport;
 
 import javax.swing.*;
-import javax.swing.table.DefaultTableModel;
+import javax.swing.table.*;
 import java.awt.*;
 
 public class CatalogoClientePanel extends JPanel {
     private final DefaultTableModel model;
+    private final ConcessionarioController controller;
 
-    public CatalogoClientePanel() {
+    public CatalogoClientePanel(ConcessionarioController ctrl) {
+        this.controller = ctrl;
         setLayout(new BorderLayout(10, 10));
         setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
 
@@ -33,7 +35,7 @@ public class CatalogoClientePanel extends JPanel {
         Runnable load = () -> {
             try {
                 model.setRowCount(0);
-                for (Veicolo v : VeicoloDAO.getAllVeicoli()) {
+                for (Veicolo v : this.controller.getAllVeicoli()) {
                     model.addRow(new Object[]{v.getTarga(), v.getMarca(), v.getModello(), v.getTipo(), v.getPrezzo(), v.getStato()});
                 }
             } catch (Exception ex) {

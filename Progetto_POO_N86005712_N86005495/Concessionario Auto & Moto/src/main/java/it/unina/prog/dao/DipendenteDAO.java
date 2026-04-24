@@ -1,44 +1,32 @@
 package it.unina.prog.dao;
 
-import it.unina.prog.DBManager;
+import it.unina.prog.exception.DatabaseException;
 import it.unina.prog.model.Dipendente;
 
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
+/**
+ * DAO Interface per la gestione dei Dipendenti.
+ * Meno ricca di ClienteDAO poiché i dipendenti non possono self-registrarsi.
+ * L'implementazione concreta è in DipendenteDAOImpl.
+ * 
+ * Responsabilità:
+ * - Autenticazione dei dipendenti (login)
+ * - Lettura dei dati del dipendente
+ */
+public interface DipendenteDAO {
+    /**
+     * Recupera un dipendente per ID.
+     * @param id id del dipendente
+     * @return oggetto Dipendente o null se non trovato
+     * @throws DatabaseException se la query fallisce
+     */
+    Dipendente getDipendenteById(int id) throws DatabaseException;
 
-public final class DipendenteDAO {
-    private DipendenteDAO() {
-    }
-
-    public static Dipendente getDipendenteById(int id) throws SQLException {
-        String sql = "SELECT id, nome, ruolo, password FROM Dipendente WHERE id = ?";
-        try (Connection conn = DBManager.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, id);
-            try (ResultSet rs = ps.executeQuery()) {
-                if (rs.next()) {
-                    return new Dipendente(
-                            rs.getInt("id"),
-                            rs.getString("nome"),
-                            rs.getString("ruolo"),
-                            rs.getString("password")
-                    );
-                }
-            }
-        }
-        return null;
-    }
-
-    public static Dipendente autenticaDipendente(int id, String password) throws SQLException {
-        Dipendente dipendente = getDipendenteById(id);
-        if (dipendente == null) {
-            return null;
-        }
-        if (!dipendente.getPassword().equals(password)) {
-            return null;
-        }
-        return dipendente;
-    }
+    /**
+     * Autentica un dipendente verificando ID e password.
+     * @param id id del dipendente
+     * @param password password inserita dall'utente
+     * @return oggetto Dipendente se credenziali valide, null altrimenti
+     * @throws DatabaseException se la verifica fallisce
+     */
+    Dipendente autenticaDipendente(int id, String password) throws DatabaseException;
 }

@@ -1,13 +1,11 @@
-package it.unina.prog.ui.panels.employee;
+package it.unina.prog.gui.panels.employee;
 
-import it.unina.prog.dao.ClienteDAO;
-import it.unina.prog.dao.VeicoloDAO;
-import it.unina.prog.dao.VenditaDAO;
+import it.unina.prog.controller.ConcessionarioController;
 import it.unina.prog.model.Cliente;
 import it.unina.prog.model.Veicolo;
-import it.unina.prog.ui.common.UiSupport;
-import it.unina.prog.ui.model.UiModels.ClienteItem;
-import it.unina.prog.ui.model.UiModels.VeicoloItem;
+import it.unina.prog.gui.common.UiSupport;
+import it.unina.prog.gui.model.UiModels.ClienteItem;
+import it.unina.prog.gui.model.UiModels.VeicoloItem;
 
 import javax.swing.*;
 import java.awt.*;
@@ -17,8 +15,10 @@ public class VenditaPanel extends JPanel {
     private final JComboBox<ClienteItem> cliente = new JComboBox<>();
     private final JTextField dipendente = new JTextField("1", 8);
     private final JTextField prezzo = new JTextField(10);
+    private final ConcessionarioController controller;
 
-    public VenditaPanel(int dipendenteId) {
+    public VenditaPanel(ConcessionarioController ctrl, int dipendenteId) {
+        this.controller = ctrl;
         setLayout(new BorderLayout(10, 10));
         setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
 
@@ -53,7 +53,7 @@ public class VenditaPanel extends JPanel {
 
         add(form, BorderLayout.NORTH);
 
-        JTextArea note = new JTextArea("Flusso semplificato: seleziona veicolo disponibile, cliente e completa la vendita.");
+        JTextArea note = new JTextArea("Per registrare una vendita: scegli un veicolo disponibile e un cliente. Il prezzo viene compilato automaticamente; verifica i dati e premi Conferma Vendita.");
         note.setEditable(false);
         note.setLineWrap(true);
         note.setWrapStyleWord(true);
@@ -65,10 +65,10 @@ public class VenditaPanel extends JPanel {
             try {
                 veicolo.removeAllItems();
                 cliente.removeAllItems();
-                for (Veicolo v : VeicoloDAO.getVeicoliDisponibili()) {
+                for (Veicolo v : this.controller.getVeicoliDisponibili()) {
                     veicolo.addItem(new VeicoloItem(v.getTarga(), v.getModello(), v.getPrezzo()));
                 }
-                for (Cliente c : ClienteDAO.getClienti()) {
+                for (Cliente c : this.controller.getClienti()) {
                     cliente.addItem(new ClienteItem(c.getId(), c.getNome()));
                 }
                 VeicoloItem selected = (VeicoloItem) veicolo.getSelectedItem();
@@ -92,7 +92,7 @@ public class VenditaPanel extends JPanel {
                     throw new IllegalArgumentException("Seleziona veicolo e cliente");
                 }
                 prezzo.setText(String.valueOf(v.prezzo));
-                VenditaDAO.effettuaVendita(v.targa, c.id, Integer.parseInt(dipendente.getText().trim()), v.prezzo);
+                this.controller.effettuaVendita(v.targa, c.id, Integer.parseInt(dipendente.getText().trim()), v.prezzo);
                 JOptionPane.showMessageDialog(this, "Vendita registrata con successo");
                 load.run();
             } catch (Exception ex) {

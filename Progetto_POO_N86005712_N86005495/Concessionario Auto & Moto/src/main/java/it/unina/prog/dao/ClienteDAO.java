@@ -1,126 +1,83 @@
 package it.unina.prog.dao;
 
-import it.unina.prog.DBManager;
+import it.unina.prog.exception.DatabaseException;
 import it.unina.prog.model.Cliente;
 
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Statement;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 
-public class ClienteDAO {
-    public static void inserisciCliente(String nome, String tipo, String email, String telefono, String password) throws SQLException {
-        String sql = "INSERT INTO Cliente (nome, tipo, email, telefono, password) VALUES (?, ?, ?, ?, ?)";
-        try (Connection conn = DBManager.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, nome);
-            ps.setString(2, tipo);
-            ps.setString(3, email);
-            ps.setString(4, telefono);
-            ps.setString(5, password);
-            ps.executeUpdate();
-        }
-    }
+/**
+ * DAO Interface per la gestione dei Clienti.
+ * Definisce i contratti per tutte le operazioni di CRUD sui clienti.
+ * L'implementazione concreta è in ClienteDAOImpl.
+ * 
+ * Responsabilità:
+ * - Autenticazione dei clienti (login)
+ * - CRUD completo sui dati del cliente
+ * - Queries per recuperare clienti da vari criteri
+ */
+public interface ClienteDAO {
+    /**
+     * Inserisce un nuovo cliente nel database.
+     * @param nome nome del cliente
+     * @param tipo tipo (es. "Privato")
+     * @param email email di contatto
+     * @param telefono numero di telefono
+     * @param password password per il login
+     * @throws DatabaseException se l'inserimento fallisce
+     */
+    void inserisciCliente(String nome, String tipo, String email, String telefono, String password) throws DatabaseException;
 
-    public static List<Cliente> getClienti() throws SQLException {
-        List<Cliente> clienti = new ArrayList<>();
-        String sql = "SELECT * FROM Cliente";
-        try (Connection conn = DBManager.getConnection();
-             Statement st = conn.createStatement();
-             ResultSet rs = st.executeQuery(sql)) {
-            while (rs.next()) {
-                clienti.add(new Cliente(
-                    rs.getInt("id"),
-                    rs.getString("nome"),
-                    rs.getString("tipo"),
-                    rs.getString("email"),
-                    rs.getString("telefono")
-                ));
-            }
-        }
-        return clienti;
-    }
+    /**
+     * Recupera la lista completa di tutti i clienti.
+     * @return lista di oggetti Cliente
+     * @throws DatabaseException se la query fallisce
+     */
+    List<Cliente> getClienti() throws DatabaseException;
 
-    public static Cliente getClienteByEmail(String email) throws SQLException {
-        String sql = "SELECT id, nome, tipo, email, telefono FROM Cliente WHERE LOWER(email) = LOWER(?)";
-        try (Connection conn = DBManager.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, email);
-            try (ResultSet rs = ps.executeQuery()) {
-                if (rs.next()) {
-                    return new Cliente(
-                            rs.getInt("id"),
-                            rs.getString("nome"),
-                            rs.getString("tipo"),
-                            rs.getString("email"),
-                            rs.getString("telefono")
-                    );
-                }
-            }
-        }
-        return null;
-    }
+    /**
+     * Recupera un cliente specifico per email.
+     * @param email email del cliente da cercare
+     * @return oggetto Cliente o null se non trovato
+     * @throws DatabaseException se la query fallisce
+     */
+    Cliente getClienteByEmail(String email) throws DatabaseException;
 
-    public static Cliente autenticaCliente(String email, String password) throws SQLException {
-        String sql = "SELECT id, nome, tipo, email, telefono, password FROM Cliente WHERE LOWER(email) = LOWER(?)";
-        try (Connection conn = DBManager.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, email);
-            try (ResultSet rs = ps.executeQuery()) {
-                if (!rs.next()) {
-                    return null;
-                }
-                String passwordDb = rs.getString("password");
-                if (!password.equals(passwordDb)) {
-                    return null;
-                }
-                return new Cliente(
-                        rs.getInt("id"),
-                        rs.getString("nome"),
-                        rs.getString("tipo"),
-                        rs.getString("email"),
-                        rs.getString("telefono")
-                );
-            }
-        }
-    }
+    /**
+     * Autentica un cliente verificando email e password.
+     * @param email email del cliente
+     * @param password password inserita dall'utente
+     * @return oggetto Cliente se credenziali valide, null altrimenti
+     * @throws DatabaseException se la verifica fallisce
+     */
+    Cliente autenticaCliente(String email, String password) throws DatabaseException;
 
-    public static void aggiornaCliente(int id, String nome, String tipo, String email, String telefono) throws SQLException {
-        String sql = "UPDATE Cliente SET nome=?, tipo=?, email=?, telefono=? WHERE id=?";
-        try (Connection conn = DBManager.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, nome);
-            ps.setString(2, tipo);
-            ps.setString(3, email);
-            ps.setString(4, telefono);
-            ps.setInt(5, id);
-            ps.executeUpdate();
-        }
-    }
+    /**
+     * Aggiorna i dati di un cliente (senza modif password).
+     * @param id id del cliente da aggiornare
+     * @param nome nuovo nome
+     * @param tipo nuovo tipo
+     * @param email nuova email
+     * @param telefono nuovo telefono
+     * @throws DatabaseException se l'aggiornamento fallisce
+     */
+    void aggiornaCliente(int id, String nome, String tipo, String email, String telefono) throws DatabaseException;
 
-    public static void aggiornaClienteConPassword(int id, String nome, String tipo, String email, String telefono, String password) throws SQLException {
-        String sql = "UPDATE Cliente SET nome=?, tipo=?, email=?, telefono=?, password=? WHERE id=?";
-        try (Connection conn = DBManager.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, nome);
-            ps.setString(2, tipo);
-            ps.setString(3, email);
-            ps.setString(4, telefono);
-            ps.setString(5, password);
-            ps.setInt(6, id);
-            ps.executeUpdate();
-        }
-    }
+    /**
+     * Aggiorna i dati di un cliente inclusa la password.
+     * @param id id del cliente da aggiornare
+     * @param nome nuovo nome
+     * @param tipo nuovo tipo
+     * @param email nuova email
+     * @param telefono nuovo telefono
+     * @param password nuova password
+     * @throws DatabaseException se l'aggiornamento fallisce
+     */
+    void aggiornaClienteConPassword(int id, String nome, String tipo, String email, String telefono, String password) throws DatabaseException;
 
-    public static void eliminaCliente(int id) throws SQLException {
-        String sql = "DELETE FROM Cliente WHERE id=?";
-        try (Connection conn = DBManager.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, id);
-            ps.executeUpdate();
-        }
-    }
+    /**
+     * Elimina completamente un cliente dal database.
+     * @param id id del cliente da eliminare
+     * @throws DatabaseException se l'eliminazione fallisce
+     */
+    void eliminaCliente(int id) throws DatabaseException;
 }

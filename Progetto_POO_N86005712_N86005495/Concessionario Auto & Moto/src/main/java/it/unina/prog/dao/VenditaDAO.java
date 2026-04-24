@@ -1,21 +1,30 @@
 package it.unina.prog.dao;
 
-import it.unina.prog.DBManager;
+import it.unina.prog.exception.DatabaseException;
 
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.SQLException;
-
-public class VenditaDAO {
-    public static void effettuaVendita(String targa, int clienteId, int dipendenteId, double prezzoFinale) throws SQLException {
-        String sql = "INSERT INTO Vendita (data, veicolo, cliente, dipendente, prezzo_finale) VALUES (CURRENT_DATE, ?, ?, ?, ?)";
-        try (Connection conn = DBManager.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, targa);
-            ps.setInt(2, clienteId);
-            ps.setInt(3, dipendenteId);
-            ps.setDouble(4, prezzoFinale);
-            ps.executeUpdate();
-        }
-    }
+/**
+ * DAO Interface per la gestione delle Vendite.
+ * Responsabile di registrare le transazioni di vendita nel database.
+ * L'implementazione concreta è in VenditaDAOImpl.
+ * 
+ * Responsabilità:
+ * - Registrazione delle vendite (operazione critica)
+ * - Tracciamento di cliente, veicolo, dipendente e prezzo finale
+ */
+public interface VenditaDAO {
+    /**
+     * Registra una vendita completata nel database.
+     * Questa è un'operazione transazionale critica che lega insieme:
+     * - veicolo (identificato da targa)
+     * - cliente (chi acquista)
+     * - dipendente (chi ha effettuato la vendita)
+     * - prezzo finale (può differire da prezzo di catalogo per sconti)
+     * 
+     * @param targa targa del veicolo venduto
+     * @param clienteId id del cliente acquirente
+     * @param dipendenteId id del dipendente che ha fatto la vendita
+     * @param prezzoFinale prezzo finale della transazione
+     * @throws DatabaseException se la registrazione fallisce (es. veicolo già venduto, cliente non esiste, etc.)
+     */
+    void effettuaVendita(String targa, int clienteId, int dipendenteId, double prezzoFinale) throws DatabaseException;
 }

@@ -1,15 +1,20 @@
-package it.unina.prog.ui.panels.employee;
+package it.unina.prog.gui.panels.employee;
 
-import it.unina.prog.dao.ClienteDAO;
+import it.unina.prog.controller.ConcessionarioController;
 import it.unina.prog.model.Cliente;
-import it.unina.prog.ui.common.UiSupport;
-import it.unina.prog.ui.validation.InputValidator;
+import it.unina.prog.gui.common.UiSupport;
+import it.unina.prog.gui.validation.InputValidator;
 
 import javax.swing.*;
-import javax.swing.table.DefaultTableModel;
+import javax.swing.table.*;
 import java.awt.*;
 import java.util.List;
 
+/**
+ * Pannello dipendente per gestire la lista dei clienti.
+ * Fornisce CRUD completo: creazione, modifica, eliminazione e visualizzazione clienti.
+ * Usa una JTable per mostrare l'elenco e form in alto per inserire/editare dati.
+ */
 public class ClientiPanel extends JPanel {
     private final DefaultTableModel model;
     private final JTable table;
@@ -19,8 +24,10 @@ public class ClientiPanel extends JPanel {
     private final JTextField email = new JTextField(18);
     private final JTextField telefono = new JTextField(18);
     private final JPasswordField password = new JPasswordField(18);
+    private final ConcessionarioController controller;
 
-    public ClientiPanel() {
+    public ClientiPanel(ConcessionarioController controller) {
+        this.controller = controller;
         setLayout(new BorderLayout(10, 10));
         setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
 
@@ -74,7 +81,7 @@ public class ClientiPanel extends JPanel {
         Runnable load = () -> {
             try {
                 model.setRowCount(0);
-                List<Cliente> clienti = ClienteDAO.getClienti();
+                List<Cliente> clienti = controller.getClienti();
                 for (Cliente c : clienti) {
                     model.addRow(new Object[]{c.getId(), c.getNome(), c.getTipo(), c.getEmail(), c.getTelefono()});
                 }
@@ -100,7 +107,7 @@ public class ClientiPanel extends JPanel {
         salva.addActionListener(e -> {
             try {
                 validateClienteInput(null, true);
-                ClienteDAO.inserisciCliente(
+                controller.inserisciCliente(
                         nome.getText().trim(),
                         String.valueOf(tipo.getSelectedItem()),
                         email.getText().trim(),
@@ -126,9 +133,9 @@ public class ClientiPanel extends JPanel {
                 validateClienteInput(id, false);
                 String nuovaPassword = new String(password.getPassword()).trim();
                 if (nuovaPassword.isEmpty()) {
-                    ClienteDAO.aggiornaCliente(id, nome.getText().trim(), String.valueOf(tipo.getSelectedItem()), email.getText().trim(), telefono.getText().trim());
+                    controller.aggiornaCliente(id, nome.getText().trim(), String.valueOf(tipo.getSelectedItem()), email.getText().trim(), telefono.getText().trim());
                 } else {
-                    ClienteDAO.aggiornaClienteConPassword(id, nome.getText().trim(), String.valueOf(tipo.getSelectedItem()), email.getText().trim(), telefono.getText().trim(), nuovaPassword);
+                    controller.aggiornaClienteConPassword(id, nome.getText().trim(), String.valueOf(tipo.getSelectedItem()), email.getText().trim(), telefono.getText().trim(), nuovaPassword);
                 }
                 load.run();
                 clear();
@@ -149,7 +156,7 @@ public class ClientiPanel extends JPanel {
             int mr = table.convertRowIndexToModel(row);
             int id = (int) model.getValueAt(mr, 0);
             try {
-                ClienteDAO.eliminaCliente(id);
+                controller.eliminaCliente(id);
                 load.run();
                 clear();
             } catch (Exception ex) {
@@ -184,7 +191,7 @@ public class ClientiPanel extends JPanel {
             throw new IllegalArgumentException("La password e obbligatoria per creare il cliente");
         }
 
-        List<Cliente> clienti = ClienteDAO.getClienti();
+        List<Cliente> clienti = controller.getClienti();
         for (Cliente c : clienti) {
             String existingEmail = c.getEmail();
             if (existingEmail != null && existingEmail.equalsIgnoreCase(emailVal)) {

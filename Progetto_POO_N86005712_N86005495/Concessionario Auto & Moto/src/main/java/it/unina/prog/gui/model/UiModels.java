@@ -1,11 +1,23 @@
-package it.unina.prog.ui.model;
+package it.unina.prog.gui.model;
 
 import it.unina.prog.model.Cliente;
 
+/**
+ * Contenitore di classi di utilità per la GUI.
+ * Definisce modelli semplificati usati nei ComboBox e liste della UI.
+ * A differenza dei modelli di dominio (entity), questi sono pensati per la visualizzazione.
+ */
 public final class UiModels {
+    /**
+     * Costruttore privato: utility class.
+     */
     private UiModels() {
     }
 
+    /**
+     * Elemento cliente per visualizzazione in ComboBox.
+     * Contiene id e nome, mostra "nome (id)" quando selezionato.
+     */
     public static class ClienteItem {
         public final int id;
         public final String nome;
@@ -21,6 +33,11 @@ public final class UiModels {
         }
     }
 
+    /**
+     * Elemento veicolo per visualizzazione in ComboBox.
+     * Mostra "targa - modello" permettendo selezione semplice.
+     * Include il prezzo per operazioni di vendita.
+     */
     public static class VeicoloItem {
         public final String targa;
         public final String modello;
@@ -38,6 +55,10 @@ public final class UiModels {
         }
     }
 
+    /**
+     * Wrapper per mantenere sia i dati del cliente che la password inserita.
+     * Usato temporaneamente durante process login.
+     */
     public static class ClienteLogin {
         public final Cliente cliente;
         public final String password;

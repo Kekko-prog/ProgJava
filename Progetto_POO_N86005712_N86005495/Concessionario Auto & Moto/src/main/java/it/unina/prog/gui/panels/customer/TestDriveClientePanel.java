@@ -1,11 +1,10 @@
-package it.unina.prog.ui.panels.customer;
+package it.unina.prog.gui.panels.customer;
 
-import it.unina.prog.dao.TestDriveDAO;
-import it.unina.prog.dao.VeicoloDAO;
+import it.unina.prog.controller.ConcessionarioController;
 import it.unina.prog.model.Veicolo;
-import it.unina.prog.ui.common.UiSupport;
-import it.unina.prog.ui.model.UiModels.VeicoloItem;
-import it.unina.prog.ui.validation.InputValidator;
+import it.unina.prog.gui.common.UiSupport;
+import it.unina.prog.gui.model.UiModels.VeicoloItem;
+import it.unina.prog.gui.validation.InputValidator;
 
 import javax.swing.*;
 import java.awt.*;
@@ -14,8 +13,10 @@ import java.time.LocalDate;
 public class TestDriveClientePanel extends JPanel {
     private final JComboBox<VeicoloItem> veicolo = new JComboBox<>();
     private final JTextField data = new JTextField(LocalDate.now().toString(), 12);
+    private final ConcessionarioController controller;
 
-    public TestDriveClientePanel(int clienteId) {
+    public TestDriveClientePanel(ConcessionarioController ctrl, int clienteId) {
+        this.controller = ctrl;
         setLayout(new BorderLayout(10, 10));
         setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
 
@@ -43,7 +44,7 @@ public class TestDriveClientePanel extends JPanel {
         Runnable load = () -> {
             try {
                 veicolo.removeAllItems();
-                for (Veicolo v : VeicoloDAO.getVeicoliDisponibili()) {
+                for (Veicolo v : this.controller.getVeicoliDisponibili()) {
                     veicolo.addItem(new VeicoloItem(v.getTarga(), v.getModello(), v.getPrezzo()));
                 }
             } catch (Exception ex) {
@@ -63,7 +64,7 @@ public class TestDriveClientePanel extends JPanel {
                 LocalDate dataTestDrive = InputValidator.parseDateOrThrow(dataInput);
                 InputValidator.requireTodayOrFuture(dataTestDrive);
 
-                TestDriveDAO.richiediTestDrive(clienteId, v.targa, dataInput);
+                this.controller.richiediTestDrive(clienteId, v.targa, dataInput);
                 JOptionPane.showMessageDialog(this, "Test drive registrato con successo");
                 load.run();
             } catch (Exception ex) {

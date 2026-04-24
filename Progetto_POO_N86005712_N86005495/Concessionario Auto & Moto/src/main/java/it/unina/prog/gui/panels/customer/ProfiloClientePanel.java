@@ -1,21 +1,22 @@
-package it.unina.prog.ui.panels.customer;
+package it.unina.prog.gui.panels.customer;
 
-import it.unina.prog.DBManager;
-import it.unina.prog.ui.common.UiSupport;
-import it.unina.prog.ui.validation.InputValidator;
+import it.unina.prog.controller.ConcessionarioController;
+import it.unina.prog.model.Cliente;
+import it.unina.prog.gui.common.UiSupport;
+import it.unina.prog.gui.validation.InputValidator;
 
 import javax.swing.*;
 import java.awt.*;
-import java.sql.Connection;
-import java.sql.ResultSet;
 
 public class ProfiloClientePanel extends JPanel {
     private final JTextField nome = new JTextField(18);
     private final JTextField tipo = new JTextField(12);
     private final JTextField email = new JTextField(18);
     private final JTextField telefono = new JTextField(18);
+    private final ConcessionarioController controller;
 
-    public ProfiloClientePanel(int clienteId) {
+    public ProfiloClientePanel(ConcessionarioController ctrl, int clienteId) {
+        this.controller = ctrl;
         setLayout(new BorderLayout(10, 10));
         setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
 
@@ -50,19 +51,15 @@ public class ProfiloClientePanel extends JPanel {
         add(form, BorderLayout.NORTH);
 
         Runnable load = () -> {
-            String sql = "SELECT nome, tipo, email, telefono FROM Cliente WHERE id = ?";
-            try (Connection conn = DBManager.getConnection();
-                 java.sql.PreparedStatement ps = conn.prepareStatement(sql)) {
-                ps.setInt(1, clienteId);
-                try (ResultSet rs = ps.executeQuery()) {
-                    if (!rs.next()) {
-                        throw new IllegalArgumentException("Cliente non trovato");
-                    }
-                    nome.setText(rs.getString("nome"));
-                    tipo.setText(rs.getString("tipo"));
-                    email.setText(rs.getString("email"));
-                    telefono.setText(rs.getString("telefono"));
+            try {
+                Cliente cliente = this.controller.getProfiloCliente(clienteId);
+                if (cliente == null) {
+                    throw new IllegalArgumentException("Cliente non trovato");
                 }
+                nome.setText(cliente.getNome());
+                tipo.setText(cliente.getTipo());
+                email.setText(cliente.getEmail());
+                telefono.setText(cliente.getTelefono());
             } catch (Exception ex) {
                 UiSupport.showErr(this, ex);
             }
@@ -73,14 +70,7 @@ public class ProfiloClientePanel extends JPanel {
         salva.addActionListener(e -> {
             try {
                 validateEmailTelefono();
-                String sql = "UPDATE Cliente SET email = ?, telefono = ? WHERE id = ?";
-                try (Connection conn = DBManager.getConnection();
-                     java.sql.PreparedStatement ps = conn.prepareStatement(sql)) {
-                    ps.setString(1, email.getText().trim());
-                    ps.setString(2, telefono.getText().trim());
-                    ps.setInt(3, clienteId);
-                    ps.executeUpdate();
-                }
+                this.controller.aggiornaContattiCliente(clienteId, email.getText().trim(), telefono.getText().trim());
                 JOptionPane.showMessageDialog(this, "Profilo aggiornato con successo");
                 load.run();
             } catch (Exception ex) {

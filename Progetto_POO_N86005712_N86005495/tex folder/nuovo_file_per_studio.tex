@@ -1,0 +1,628 @@
+\documentclass[12pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[italian]{babel}
+\usepackage{geometry}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{enumitem}
+\usepackage{tikz}
+
+\geometry{margin=2cm}
+
+\lstdefinestyle{javastyle}{
+  basicstyle=\ttfamily\small,
+  keywordstyle=\color{blue},
+  commentstyle=\color{gray},
+  stringstyle=\color{red},
+  breaklines=true,
+  showstringspaces=false,
+  frame=single
+}
+
+\title{Spiegazione Approfondita delle Funzioni\\Progetto Concessionario Auto \& Moto\\Architettura BCE + DAO}
+\author{N86005495 \and N86005712}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+\newpage
+\tableofcontents
+\newpage
+
+\section{Introduzione e Struttura del Documento}
+
+Questo documento spiega il progetto seguendo una struttura per \textbf{funzioni specifiche}, non per codice copiato.
+L'obiettivo: capire \textbf{cosa fa} ogni funzione, \textbf{come è utilizzata}, e \textbf{perché esiste}.
+
+Ogni funzione è descritta con:
+\begin{enumerate}
+  \item \textbf{Cosa fa}: responsabilità concreta della funzione.
+  \item \textbf{Come viene usata}: in quale contesto, da quale altro codice.
+  \item \textbf{Perché esiste}: problema che risolve, valore che aggiunge all'architettura.
+  \item \textbf{File}: dove si trova nel progetto.
+\end{enumerate}
+
+Le funzioni sono organizzate per \textbf{livelli architetturali} (Entry Point $\to$ GUI $\to$ Controller $\to$ DAO $\to$ Entity $\to$ Database), non per file singoli.
+Se una funzione è usata in modi diversi, è spiegata per ogni contesto senza ripetizione dei concetti base.
+
+\section{Architettura complessiva: il pattern BCE + DAO}
+
+Il progetto separa il codice in cinque livelli rigidamente separati:
+
+\begin{enumerate}
+  \item \textbf{Boundary (B):} GUI, widget Swing. Responsabilità: presentare informazioni all'utente, catturare input, delegare al controller.
+    Non contiene logica di business, validazione complessa, o accesso diretto a DB.
+    Se il controller cambia, la GUI non deve cambiare (teoricamente).
+  
+  \item \textbf{Control (C):} Orchestratore della logica. Responsabilità: ricevere richieste dalla GUI, validare input, coordinare i DAO, applicare regole di business, tradurre eccezioni tecniche in semantiche applicative.
+    Il controller è l'unico punto di contatto tra GUI e DAO: la GUI non chiama direttamente il DAO.
+  
+  \item \textbf{Entity (E):} Modelli di dominio immutabili (Cliente, Veicolo, Dipendente).
+    Rappresentano concetti del mondo reale. Campi immutabili (final), niente getter/setter, niente logica complessa.
+    Sono le strutture dati che circolano tra controller e GUI.
+  
+  \item \textbf{DAO:} Data Access Object. Layer di accesso ai dati che incapsula SQL e JDBC.
+    Fornisce un'interfaccia semplice (inserisci, leggi, aggiorna, cancella) al controller senza esporre i dettagli SQL.
+    Se il DB cambia (PostgreSQL $\to$ MongoDB), scrivi una nuova implementazione DAO, il controller non sa la differenza.
+  
+  \item \textbf{Database:} PostgreSQL con vincoli (constraint), funzioni (stored procedure), trigger, e transazioni.
+    È la fonte unica di verità: lo stato del DB è lo stato dell'applicazione.
+    Applica integrità a livello database: vincoli check, foreign key, trigger per logica che non può essere fidata al livello applicativo.
+\end{enumerate}
+
+\textbf{Flusso verticale di un'operazione (esempio: utente clicca ``Salva Cliente''):}
+
+\begin{center}
+\begin{tabular}{|l|l|}
+\hline
+Livello & Cosa accade \\
+\hline
+Boundary (GUI) & Utente digita dati, clicca bottone. GUI legge form e chiama Controller. \\
+\hline
+Control (Controller) & Riceve dati dal pannello. Valida (email formato, telefono 10 cifre). \\
+& Controlla duplicati (email già registrata?). Se errore $\to$ lancia exception. \\
+& Se ok $\to$ chiama DAO. \\
+\hline
+DAO & Riceve dati validati. Genera SQL INSERT. Apre connessione. Esegue. \\
+& Se SQL fallisce (constraint violato) $\to$ lancia DatabaseException. \\
+& Se ok $\to$ ritorna success al controller. \\
+\hline
+Database & Riceve INSERT. Controlla constraint (email UNIQUE, format check). \\
+& Se ok $\to$ inserisce. Se fallisce $\to$ exception SQL. \\
+\hline
+Ritorno & DAO ritorna risultato (success/exception) al Controller. \\
+& Controller cattura exception, la traduce. Ritorna al pannello GUI. \\
+& GUI mostra dialog: success o messaggio di errore. \\
+\hline
+\end{tabular}
+\end{center}
+
+\textbf{Perché questa separazione è importante:}
+
+\begin{itemize}
+  \item \textbf{Testabilità:} Scrivi test che chiama il Controller senza GUI. MockaI il DAO. Niente browser, niente click.
+  \item \textbf{Manutenibilità:} Una query SQL cambia? Modifichi solo ClienteDAOImpl. Il Controller e la GUI non sanno.
+  \item \textbf{Riusabilità:} Vuoi una API REST che aggiunge clienti? Chiama lo stesso Controller, bypassa la GUI.
+  \item \textbf{Scalabilità:} Vuoi cambiare DB? Implementi ClienteDAOMongo, plugghi nel Controller, niente cambia in GUI o Controller.
+  \item \textbf{Debugging:} Un bug in una operazione? Sai esattamente dove cercare: GUI $\to$ Controller $\to$ DAO $\to$ DB. Non è caos.
+\end{itemize}
+
+
+
+\section{Entry Point e Bootstrap}
+
+\subsection{Main.main() -- File: Main.java}
+
+\textbf{Cosa fa:}
+Punto di ingresso assoluto del programma. Riceve il controllo dalla JVM e lo delega a MainApp.
+
+\textbf{Come viene usato:}
+Quando l'utente avvia l'applicazione (doppio click su .jar o esecuzione da terminale), la JVM cerca il metodo \texttt{public static void main(String[] args)} e lo esegue da qui.
+
+\textbf{Perché esiste:}
+Fornisce un'indirezione: se in futuro devi aggiungere logica di bootstrap (parsing argomenti, config da file, check licenza), lo fai qui senza toccare MainApp.
+
+\subsection{MainApp.main() -- File: MainApp.java}
+
+\textbf{Cosa fa:}
+Prepara l'ambiente Swing e lancia la finestra principale (\texttt{ConcessionarioFrame}).
+
+Due responsabilità principali:
+\begin{enumerate}
+  \item Esegue il setup UI sul thread EDT (Event Dispatch Thread).
+  \item Imposta il look-and-feel nativo (Windows, macOS, GTK).
+\end{enumerate}
+
+\textbf{Come viene usato:}
+Chiamata da \texttt{Main.main()}. Assicura che la finestra Swing emerga sul thread corretto.
+
+\textbf{Perché esiste:}
+Swing è thread-sensitive: tutti gli aggiornamenti UI devono avvenire su un thread speciale (EDT).
+Se crei componenti Swing dal thread principale, otterrai race condition e crash UI.
+\texttt{SwingUtilities.invokeLater(() -> \{ ... \})} mette il blocco di codice in coda all'EDT.
+Quando EDT è libero, lo esegue in un contesto thread-safe.
+
+Il \texttt{UIManager.setLookAndFeel()} adatta la GUI al SO (Windows button diverse da macOS, colori GTK su Linux).
+Senza questo, l'app ha un look ``generico Java'' che sembra fuori posto su qualsiasi SO.
+
+\section{Livello Boundary: La GUI con Swing}
+
+\subsection{ConcessionarioFrame() -- Constructor. File: ConcessionarioFrame.java}
+
+\textbf{Cosa fa:}
+Costruisce la finestra principale. Divide lo spazio in due zone: header statico (titolo + logout) e area dinamica con CardLayout.
+
+\textbf{Come viene usato:}
+Istanziata da MainApp. Durante costruzione, prepara il layout, crea il CardLayout, e aggiunge il login panel.
+
+\textbf{Perché esiste:}
+È il contenitore di tutta l'UI. All'avvio, mostra login. Dopo autenticazione, sostituisce il content con l'area DIPENDENTE o CLIENTE.
+Mantenendo una sola JFrame, non crei finestre spurie; tutto è dentro una finestra unica.
+
+\textbf{CardLayout: il meccanismo di switch:}
+Il CardLayout è un layout manager che tiene molteplici pannelli (``card'') sovapposti, mostrando uno alla volta.
+Quando utente fa login, chiami \texttt{cardLayout.show(cardsPanel, "CLIENTE\_CARD")}, e il pannello CLIENTE diventa visibile.
+Vantaggio: non ricostruisci l'UI; mantieni lo stato.
+
+\subsection{ConcessionarioFrame.createHeader() -- File: ConcessionarioFrame.java}
+
+\textbf{Cosa fa:}
+Crea il pannello header (zona NORTH): titolo a sinistra, info sessione + logout a destra.
+
+\textbf{Come viene usato:}
+Chiamata da \texttt{ConcessionarioFrame()}, aggiunta al frame con \texttt{add(..., BorderLayout.NORTH)}.
+L'header è statico: non cambia durante l'uso dell'app.
+
+\textbf{Perché esiste:}
+Separa visualmente il contenuto principale (CENTER) da info di sessione.
+Header mostra always chi è autenticato, consente quick logout.
+
+\subsection{ConcessionarioFrame.createLoginPanel() -- File: ConcessionarioFrame.java}
+
+\textbf{Cosa fa:}
+Costruisce pannello login con due sezioni: Cliente (email/password) e Dipendente (id/password).
+Bottoni separati: ``Login Cliente'', ``Login Dipendente''.
+
+\textbf{Come viene usato:}
+Aggiunta al CardLayout come prima card (LOGIN\_CARD).
+Utente digita credenziali, clicca bottone $\to$ trigger action listener $\to$ \texttt{handleClienteLogin()} o \texttt{handleDipendenteLogin()}.
+
+\textbf{Perché esiste:}
+Punto di ingresso: due percorsi autenticazione (cliente vs. dipendente) con GUI diversa.
+
+\subsection{ConcessionarioFrame.handleClienteLogin() -- File: ConcessionarioFrame.java}
+
+\textbf{Cosa fa:}
+Estrae email/password da form, chiama \texttt{Controller.autenticaCliente()}.
+Se autenticazione succede, aggiorna header (sessionLabel, abilita logout), costruisce area cliente, mostra card CLIENTE.
+Se errore, mostra dialog di errore con messaggio amichevole.
+
+\textbf{Come viene usato:}
+Listener del bottone ``Login Cliente''.
+
+\textbf{Perché esiste:}
+Gestisce il flusso login: input $\to$ controller $\to$ result $\to$ update header e card.
+
+\subsection{ConcessionarioFrame.buildClienteArea() -- File: ConcessionarioFrame.java}
+
+\textbf{Cosa fa:}
+Crea il JTabbedPane con 4 tab per il cliente:
+\begin{enumerate}
+  \item Profilo: edit email/telefono.
+  \item Catalogo: vedi veicoli disponibili (read-only).
+  \item Prenota Test Drive: form per richiedere test drive.
+  \item Le Mie Operazioni: storico vendite e test drive.
+\end{enumerate}
+
+\textbf{Come viene usato:}
+Chiamata da \texttt{handleClienteLogin()} dopo autenticazione riuscita.
+Pannello ritornato è aggiunto al CardLayout e reso visibile.
+
+\textbf{Perché esiste:}
+Organizza le funzionalità cliente in tab logici. Ogni tab è un pannello specializzato (ProfiloClientePanel, CatalogoClientePanel, etc.).
+
+\subsection{ConcessionarioFrame.handleLogout() -- File: ConcessionarioFrame.java}
+
+\textbf{Cosa fa:}
+Ripristina lo stato iniziale: mostra LOGIN card, resetta sessionLabel a ``Non autenticato'', disabilita bottone logout.
+
+\textbf{Come viene usato:}
+Listener del bottone Logout nell'header.
+
+\textbf{Perché esiste:}
+Chiude la sessione corrente senza chiudere l'applicazione.
+
+\section{Livello Boundary: Pannelli Specifici}
+
+\subsection{ClientiPanel -- File: ClientiPanel.java (Dipendente)}
+
+\textbf{Cosa fa:}
+Pannello CRUD per dipendenti. Tabella con lista clienti a sinistra, form (nome, email, telefono, tipo) a destra.
+Bottoni: Aggiungi, Modifica, Elimina, Aggiorna.
+
+\textbf{Come viene usato:}
+Istanziata e aggiunta a JTabbedPane quando dipendente autentica, in tab ``Clienti''.
+
+\textbf{Metodi interni principali:}
+
+\begin{itemize}
+  \item \texttt{loadClienti()}: chiama \texttt{Controller.getClienti()}, riceve lista, popola tabella.
+  \item \texttt{onRowSelected()}: utente clicca riga in tabella $\to$ estrae dati e riempie form per modifica/view.
+  \item \texttt{onAggiungi()}: legge form, valida, chiama \texttt{Controller.inserisciCliente()}, ricarica tabella.
+  \item \texttt{onModifica()}: estrae ID da riga selezionata, chiama \texttt{Controller.aggiornaCliente()}.
+  \item \texttt{onElimina()}: richiede conferma, chiama \texttt{Controller.eliminaCliente()}.
+\end{itemize}
+
+\textbf{Perché esiste:}
+Consente al dipendente di gestire anagrafe clienti senza accesso diretto a DB o SQL.
+
+\subsection{VeicoliPanel -- File: VeicoliPanel.java (Dipendente)}
+
+\textbf{Cosa fa:}
+CRUD veicoli. Tabella (targa, marca, modello, tipo, prezzo, stato), form per inserimento.
+
+Logica speciale: se la marca non esiste in DB, chiede al dipendente di crearla.
+
+\textbf{Metodi interni:}
+\begin{itemize}
+  \item \texttt{onAggiungi()}: estrae dati, controlla se marca esiste, se no popup ``Creare marca?''.
+    Se sì, chiede nazione di origine e crea marca, poi veicolo.
+\end{itemize}
+
+\textbf{Perché esiste:}
+Gestione dell'inventario: aggiungi auto, moto, e loro stati (disponibile, venduto).
+
+\subsection{VenditaPanel -- File: VenditaPanel.java (Dipendente)}
+
+\textbf{Cosa fa:}
+Form per registrare una vendita: combo clienti, combo veicoli disponibili, campo prezzo finale.
+Quando selezioni un veicolo, il prezzo si popola automaticamente dal DB.
+Bottone ``Effettua Vendita'' chiama \texttt{Controller.effettuaVendita()}.
+
+\textbf{Perché esiste:}
+Registra transazioni di vendita. Il controller controlla che veicolo sia disponibile, dipendente è autenticato, etc.
+
+\subsection{TestDrivePanel -- File: TestDrivePanel.java (Dipendente)}
+
+\textbf{Cosa fa:}
+Form per prenotare test drive per un cliente.
+Combo cliente, combo veicoli, campo data (future date picker).
+
+\textbf{Come viene usato:}
+Tab ``Test Drive'' nell'area dipendente.
+
+\textbf{Perché esiste:}
+Consente al dipendente di creare prenotazioni test drive per clienti.
+
+\subsection{ProfiloClientePanel -- File: ProfiloClientePanel.java (Cliente)}
+
+\textbf{Cosa fa:}
+Mostra profilo cliente (nome, email, telefono).
+Consente edizione email e telefono con bottone ``Salva''.
+
+\textbf{Come viene usato:}
+Tab ``Profilo'' nell'area cliente.
+
+\textbf{Perché esiste:}
+Consente al cliente di aggiornare i propri contatti.
+
+\subsection{CatalogoClientePanel -- File: CatalogoClientePanel.java (Cliente)}
+
+\textbf{Cosa fa:}
+Mostra tabella read-only di veicoli disponibili (targa, marca, modello, tipo, prezzo, stato).
+
+\textbf{Come viene usato:}
+Tab ``Catalogo'' nell'area cliente.
+
+\textbf{Perché esiste:}
+Consente al cliente di visionare offerta senza rischio di modifica accidentale.
+
+\subsection{OperazioniClientePanel -- File: OperazioniClientePanel.java (Cliente)}
+
+\textbf{Cosa fa:}
+Dual-table view: storico vendite (quando, quale veicolo, prezzo) e storico test drive (quando, quale veicolo, eliminabili).
+Cliente può cancellare prenotazioni test drive future.
+
+\textbf{Come viene usato:}
+Tab ``Le Mie Operazioni'' nell'area cliente.
+
+\textbf{Perché esiste:}
+Consente al cliente di tracciare la propria cronologia e gestire prenotazioni.
+
+\section{Livello Control: Orchestrazione della Logica}
+
+\subsection{ConcessionarioController() -- Constructor. File: ConcessionarioController.java}
+
+\textbf{Cosa fa:}
+Istanzia tutti i DAO impl (ClienteDAOImpl, VeicoloDAOImpl, VenditaDAOImpl, TestDriveDAOImpl, DipendenteDAOImpl).
+
+\textbf{Come viene usato:}
+Constructor chiamato dalla GUI (ConcessionarioFrame, pannelli).
+
+\textbf{Perché esiste:}
+Il controller è il depositario di tutti i DAO. Da qui, GUI accede ai dati senza sapere quale DAO concreto sta usando (polimorfismo).
+
+\subsection{ConcessionarioController.autenticaCliente() -- File: ConcessionarioController.java}
+
+\textbf{Cosa fa:}
+Riceve email e password da GUI e ritorna un oggetto Cliente se autenticazione ha successo.
+
+Logica interna:
+\begin{enumerate}
+  \item Controlla che email non sia null e non sia stringa vuota. Se fallisce, solleva \texttt{ValidationException}.
+  \item Controlla che password non sia null e non sia stringa vuota. Se fallisce, solleva \texttt{ValidationException}.
+  \item Valida formato email via \texttt{InputValidator.isValidEmail(email)}: regex controlla che ci sia '@' e '.' nel posto giusto.
+    Se email non ha formato valido, solleva \texttt{ValidationException(``Email non valida'')}.
+  \item Chiama \texttt{ClienteDAO.autenticaCliente(email, password)}.
+    Il DAO fa una query case-insensitive (mario@example.com = MARIO@EXAMPLE.COM) e confronta password.
+  \item Se DAO ritorna Cliente non-null, lo ritorna al caller (GUI). Autenticazione riuscita.
+  \item Se DAO ritorna null, solleva \texttt{ValidationException(``Email o password non corretti'')}.
+\end{enumerate}
+
+\textbf{Dettagli di implementazione interna:}
+
+La validazione è doppia:
+\begin{itemize}
+  \item \textbf{Nel Controller:} formato email, non-null check.
+  \item \textbf{Nel DAO:} query al DB con case-insensitive, confronto password.
+\end{itemize}
+
+Perché separare? Se la GUI è buggy e passa email malformata, il Controller la butta fuori senza neanche toccare il DB (economia).
+Se invece API REST chiama il Controller, la validazione avviene lo stesso (non dipendi dalla GUI).
+
+\textbf{Edge case: email diverso da maiuscole/minuscole}
+
+Scenario: utente registrato come \texttt{Mario@Example.com}, prova login con \texttt{mario@example.com}.
+Il DAO usa \texttt{LOWER(email)} in query SQL, quindi entrambe matchano. Bene.
+
+Scenario: utente registrato come \texttt{Mario@Example.com}, prova login con \texttt{mario@EXAMPLE.COM}.
+Idem: LOWER() gestisce entrambe. Bene.
+
+\textbf{Come viene usato:}
+GUI (handleClienteLogin in ConcessionarioFrame) estrae email e password da form, chiama questo metodo.
+Se succeed, ritorna Cliente con id/nome/email. La GUI aggiorna header (``Autenticato come Mario'').
+Se exception, GUI catcha e mostra dialog.
+
+\textbf{Perché esiste:}
+Centralizza autenticazione. Se in futuro cambi il meccanismo (da plaintext password a bcrypt-hashed), cambi SOLO qui e nel DAO.
+La GUI non sa che cosa è successo: chiama il controller, riceve Cliente o exception, basta.
+
+\subsection{ConcessionarioController.autenticaDipendente() -- File: ConcessionarioController.java}
+
+\textbf{Cosa fa:}
+Analogo a autenticaCliente, ma riceve ID (intero) e password.
+Valida non-null, chiama \texttt{DipendenteDAO.autenticaDipendente()}.
+
+\textbf{Come viene usato:}
+handleDipendenteLogin nel frame.
+
+\subsection{ConcessionarioController.inserisciCliente() -- File: ConcessionarioController.java}
+
+\textbf{Cosa fa:}
+Inserisce un nuovo cliente nel DB. Riceve nome, tipo, email, telefono, password.
+
+Logica interna (validazione a strati):
+
+\begin{enumerate}
+  \item \textbf{Validazione nome:} null o empty $\Rightarrow$ \texttt{ValidationException}.
+  \item \textbf{Validazione email:} null, empty, o formato invalido $\Rightarrow$ \texttt{ValidationException}.
+    Es. \texttt{mario} senza '@' fallisce. \texttt{mario@} fallisce (no nome dominio). \texttt{mario@domain} fallisce (no TLD).
+\subsection{InputValidator.isValidPhone()} -- File: InputValidator.java}
+
+\textbf{Cosa fa:}
+Valida numero di telefono: esattamente 10 cifre numeriche.
+Regex: \texttt{\^\\d\{10\}\$}.
+
+\textbf{Regex Breakdown:}
+
+\begin{verbatim}
+^      # Inizio stringa
+\\d{10} # Esattamente 10 cifre (0-9)
+\$      # Fine stringa
+\end{verbatim}
+
+\texttt{\\d} = qualunque cifra da 0 a 9.
+\texttt{\\d\{10\}} = ripeti esattamente 10 volte.
+
+\textbf{Esempi che PASSANO:}
+
+\begin{itemize}
+  \item \texttt{0123456789}: 10 cifre. ✓
+  \item \texttt{1234567890}: 10 cifre. ✓
+  \item \texttt{9999999999}: 10 noni. ✓
+\end{itemize}
+
+\textbf{Esempi che FALLANO:}
+
+\begin{itemize}
+  \item \texttt{123456789}: 9 cifre, < 10. ✗
+  \item \texttt{12345678901}: 11 cifre, > 10. ✗
+  \item \texttt{123-456-7890}: Contiene trattini. Il trattino non è \\d. ✗
+  \item \texttt{123 456 7890}: Contiene spazi. Lo spazio non è \\d. ✗
+  \item \texttt{+39 123456789}: Contiene '+' e spazio. ✗
+\end{itemize}
+
+\textbf{Nota sul Design:}
+
+Questo regex è rigido: accetta SOLO 10 cifre consecutive, niente altro.
+
+Reale: numeri telefonici possono avere formati diversi (con trattini, spazi, +codice paese).
+
+Per questo progetto, "10 cifre" è sufficiente ed è facile da validare.
+
+\textbf{Come viene usato:}
+
+Controller.inserisciCliente() valida campo telefono prima di passare al DAO.
+
+\subsection{InputValidator.isValidPlate()} -- File: InputValidator.java}
+
+\textbf{Cosa fa:}
+Controlla targa: 5-10 caratteri alfanumerici.
+
+\textbf{Come viene usato:}
+VeicoliPanel.onAggiungi() valida targa.
+
+\subsection{InputValidator.normalizePlate()} -- File: InputValidator.java}
+
+\textbf{Cosa fa:}
+Trim e UPPER: \texttt{``ab123cd''} diventa \texttt{``AB123CD''}.
+
+\textbf{Come viene usato:}
+VeicoliPanel: prima di INSERT o search, normalizza targa per coerenza.
+
+\subsection{InputValidator.parseDateOrThrow()} -- File: InputValidator.java}
+
+\textbf{Cosa fa:}
+Parsing stringa a LocalDate in formato ISO (YYYY-MM-DD).
+Se fallisce, solleva exception.
+
+\textbf{Come viene usato:}
+TestDrive form picker: data inserita dall'utente, convertita a LocalDate.
+
+\subsection{InputValidator.requireTodayOrFuture()} -- File: InputValidator.java}
+
+\textbf{Cosa fa:}
+Controlla che data non sia nel passato.
+
+\textbf{Come viene usato:}
+Controller.richiediTestDrive() valida che data è oggi o futura.
+
+\subsection{UiSupport.wrapTitled()}} -- File: UiSupport.java}
+
+\textbf{Cosa fa:}
+Riceve un JPanel, lo confeziona in un wrapper con titolo borderizzato.
+
+\textbf{Come viene usato:}
+Pannelli l'usano per marcare zone del form (``Dettagli Cliente'', ``Indirizzo'', etc.).
+
+\subsection{UiSupport.showErr()}} -- File: UiSupport.java}
+
+\textbf{Cosa fa:}
+Mostra un JOptionPane. dialog Error con messaggio.
+
+\textbf{Come viene usato:}
+Ovunque in GUI, quando catchi una exception.
+
+\subsection{UiSupport.toUserMessage()}} -- File: UiSupport.java}
+
+\textbf{Cosa fa:}
+Riceve un'exception (ValidationException, DatabaseException), ritorna un messaggio amichevole.
+
+Traduce messaggi tecnici:
+\begin{itemize}
+  \item ``cliente\_email\_key'' (constraint violation) $\to$ ``Email già registrata: usa un'altra''.
+  \item ``limit\_testdrive'' $\to$ ``Hai raggiunto il limite di 3 test drive al mese''.
+  \item Fallback: ritorna exception.getMessage().
+\end{itemize}
+
+\textbf{Come viene usato:}
+\texttt{try \{ ... \} catch (ValidationException|DatabaseException ex) \{ UiSupport.showErr(this, UiSupport.toUserMessage(ex)); \}}.
+
+\section{Flusso Completo di un'Operazione Tipica}
+
+Esempio: Dipendente aggiunge un nuovo cliente.
+
+\begin{enumerate}
+  \item \textbf{Utente clicca bottone ``Aggiungi'' in ClientiPanel.}
+  \item \textbf{ClientiPanel.onAggiungi() esegue:}
+  \begin{enumerate}
+    \item Legge campi form (nome, email, telefono, tipo).
+    \item Chiama \texttt{Controller.inserisciCliente(nome, tipo, email, telefono, password)}.
+  \end{enumerate}
+  
+  \item \textbf{Controller.inserisciCliente() esegue:}
+  \begin{enumerate}
+    \item Valida nome non vuoto.
+    \item Valida email con \texttt{InputValidator.isValidEmail(email)}.
+    \item Valida telefono con \texttt{InputValidator.isValidPhone(telefono)}.
+    \item Controlla duplicato: \texttt{ClienteDAO.getClienteByEmail(email)}.
+    \item Se trovato, solleva \texttt{ValidationException(``Email già registrata'')}.
+    \item Se ok, chiama \texttt{ClienteDAO.inserisciCliente(nome, tipo, email, telefono, password)}.
+  \end{enumerate}
+  
+  \item \textbf{ClienteDAOImpl.inserisciCliente() esegue:}
+  \begin{enumerate}
+    \item Apre connessione JDBC via \texttt{DatabaseManager.getInstance().getConnection()}.
+    \item Genera SQL: \texttt{INSERT INTO Cliente (nome, tipo, email, telefono, password) VALUES (?, ?, ?, ?, ?)}.
+    \item Imposta parametri con \texttt{ps.setString()}.
+    \item Esegue \texttt{ps.executeUpdate()}.
+    \item Se eccezione SQL (email duplicata, constraint error), wrappa in \texttt{DatabaseException}.
+    \item Chiude connessione (try-with-resources).
+  \end{enumerate}
+  
+  \item \textbf{Database PostgreSQL:}
+  \begin{enumerate}
+    \item Riceve INSERT.
+    \item Controlla constraint: email UNIQUE, telefono formato, etc.
+    \item Se ok, inserisce riga, ritorna success.
+    \item Se email non unique, riga già esiste $\Rightarrow$ exception.
+  \end{enumerate}
+  
+  \item \textbf{Ritorno alla GUI:}
+  \begin{enumerate}
+    \item Se success: ClientiPanel.onAggiungi() mostra dialog ``Successo'', chiama \texttt{loadClienti()} per ricaricare tabella, clear form.
+    \item Se exception: catch \texttt{ValidationException|DatabaseException ex}, traduce con \texttt{UiSupport.toUserMessage(ex)}, mostra error dialog.
+  \end{enumerate}
+  
+  \item \textbf{Utente vede:}
+  \begin{enumerate}
+    \item Successo: ``Cliente aggiunto con successo'', tabella aggiornata con nuovo cliente.
+    \item Errore: ``Email già registrata: usa un'altra''.
+  \end{enumerate}
+\end{enumerate}
+
+\section{Principi Architetturali Applicati}
+
+\subsection{Separation of Concerns}
+
+Ogni livello ha una responsabilità:
+\begin{itemize}
+  \item Boundary (GUI): widget, layout, event handling.
+  \item Control (Controller): validazione, logica business, coordinamento.
+  \item DAO: SQL, JDBC, eccezioni DB.
+  \item Entity: dati pure (immutabili).
+  \item DB: integrità, trigger, funzioni computate.
+\end{itemize}
+
+Cambio nel DB (schema, funzione) non tocca la GUI.
+Cambio nella GUI (layout) non tocca la logica.
+
+\subsection{Polymorphism via Interfacce}
+
+Controller dipende da \texttt{ClienteDAO} (interfaccia), non da \texttt{ClienteDAOImpl}.
+Questo consente:
+\begin{itemize}
+  \item Swap implementazione (PostgreSQL $\to$ MongoDB).
+  \item Test con MockClienteDAO (simula DB senza connessione reale).
+\end{itemize}
+
+\subsection{Immutability Entities}
+
+Cliente, Dipendente, Veicolo hanno campi final.
+Vantaggio: thread-safe per natura. Non rischio race condition di stato entity.
+
+\subsection{Try-with-Resources}
+
+Tutte le connessioni JDBC aperte con try-with-resources.
+Garantisce: anche se exception, risorsa è chiusa. Niente memory leak.
+
+\subsection{Exception Hierarchy}
+
+Eccezioni specializzate:
+\begin{itemize}
+  \item \texttt{ConcessionarioException}: base.
+  \item \texttt{ValidationException}: estende, per errori input.
+  \item \texttt{DatabaseException}: estende, per errori DB.
+\end{itemize}
+
+GUI catcha in diversi modi: \texttt{catch (ValidationException ex)} vs. \texttt{catch (DatabaseException ex)}.
+
+\textbf{Ultimo consiglio:} Leggi questo documento e il codice in parallelo. Quando vedi una classe nel codice, guarda qui cosa fa. Chiedi sempre: ``Perché esiste questa funzione?'' Una buona architettura risponde questa domanda chiaramente.
+
+\end{document}
